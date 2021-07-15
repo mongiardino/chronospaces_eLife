@@ -23,7 +23,9 @@ After obtaining the dates associated with each node across all files, and catalo
 topology <- read.tree('clockCATGTR_ln_sample.datedist')[[1]]
 #run selecting the 5 most sensitive nodes and using 1 standard deviation
 bgPCA_ages(data_ages = all_dates, tree = topology, chosen_clades = 5, amount_of_change = NA, sdev = 1)
+```
 
 ## Citations
 Lartillot N, Philippe H. 2004. A Bayesian mixture model for across-site heterogeneities in the amino-acid replacement process. Mol. Biol. Evol. 21, 1095–1109.
+
 Lartillot N, Rodrigue N, Stubbs D, Richer J. 2013. PhyloBayes MPI. Phylogenetic reconstruction with infinite mixtures of profiles in a parallel environment. Syst. Biol. 62, 611–615.
