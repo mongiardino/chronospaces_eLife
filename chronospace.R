@@ -270,6 +270,12 @@ bgPCA_ages = function(data_ages, tree = NA, chosen_clades = NA, amount_of_change
       if(num_nodes > 20) num_nodes = 20
     }
     
+    #obtain clades from tree
+    clades = list()
+    for(j in 1:tree$Nnode) {
+      clades[j] = list(tree$tip.label[unlist(Descendants(tree, length(tree$tip.label)+j, type = 'tips'))])
+    }
+    
     #make room to save the individual plots
     plots = vector(mode = "list", length = num_nodes)
     
@@ -333,7 +339,7 @@ bgPCA_ages = function(data_ages, tree = NA, chosen_clades = NA, amount_of_change
     
     #Finally, compute changes in each branch captured by the bgPCA axes (needs a
     #tree!)
-    if(is.na(tree)) {
+    if(is.na(tree)[1]) {
       cat('Plotting changes on branch lengths can only be shown if a tree is provided\n')
     } else {
       #ages implied by a position at the origin of the bgPCA plot
@@ -341,14 +347,14 @@ bgPCA_ages = function(data_ages, tree = NA, chosen_clades = NA, amount_of_change
       
       #loop through the bgPCA axes (depending on the number of groups in the
       #variable being tested)
-      for(i in 1:num_functions) {
+      for(j in 1:num_functions) {
         #create a tree that contains topology but no branch lengths
         tree$edge.length = rep(0, length(tree$edge.length))
         
         #ages implied by moving along this bgPCA axis 'sdev' number of standard
         #deviations to both sides
-        assign(paste0('plus_sd_', i), showPC(sdev*sd(scores[,i]), bgPCA$groupPCs[,i], mean))
-        assign(paste0('minus_sd_', i), showPC(-sdev*sd(scores[,i]), bgPCA$groupPCs[,i], mean))
+        assign(paste0('plus_sd_', j), showPC(sdev*sd(scores[,j]), bgPCA$groupPCs[,j], mean))
+        assign(paste0('minus_sd_', j), showPC(-sdev*sd(scores[,j]), bgPCA$groupPCs[,j], mean))
         
         #check number of descendants stemming from each node
         clade_size = unlist(lapply(clades, length))
@@ -360,21 +366,21 @@ bgPCA_ages = function(data_ages, tree = NA, chosen_clades = NA, amount_of_change
         tree_minus = tree
         
         #loop through clades from smallest to biggest (i.e., up the tree)
-        for(j in 2:max(clade_size)) {
+        for(k in 2:max(clade_size)) {
           #which nodes have the number of descendants
-          which_clades = which(clade_size == j)
+          which_clades = which(clade_size == k)
           if(length(which_clades) > 0) {
-            for(k in 1:length(which_clades)) {
+            for(l in 1:length(which_clades)) {
               #which node are we talking about
-              node_to_change = getMRCA(tree, unlist(clades[which_clades[k]]))
+              node_to_change = getMRCA(tree, unlist(clades[which_clades[l]]))
               
               #get node ages for this node
-              dif_minus = get(paste0('minus_sd_', i))[which_clades[k],]
-              dif_mean = mean[which_clades[k],]
-              dif_plus = get(paste0('plus_sd_', i))[which_clades[k],]
+              dif_minus = get(paste0('minus_sd_', j))[which_clades[l],]
+              dif_mean = mean[which_clades[l],]
+              dif_plus = get(paste0('plus_sd_', j))[which_clades[l],]
               
               #if the clade is a cherry (i.e., 2 descendants)
-              if(j == 2) {
+              if(k == 2) {
                 #get branches descending to both tips and assign them their
                 #correct branches (which is == to the node age)
                 branches_to_descendants = which(tree$edge[,1] == node_to_change)
@@ -401,19 +407,19 @@ bgPCA_ages = function(data_ages, tree = NA, chosen_clades = NA, amount_of_change
                 }
                 
                 #for descendant clades do the following
-                for(l in 1:length(nodes_of_descendants)) {
+                for(m in 1:length(nodes_of_descendants)) {
                   #obtain all descendants
-                  tips = unlist(Descendants(tree, nodes_of_descendants[l], type = 'tips'))
+                  tips = unlist(Descendants(tree, nodes_of_descendants[m], type = 'tips'))
                   
                   #remove from the age the age of the descendant node, which is
                   #already set up correctly as the loop goes from smaller to
                   #larger clades
-                  tree_minus$edge.length[which(tree_minus$edge[,2] == nodes_of_descendants[l])] = 
-                    dif_minus - dist.nodes(tree_minus)[tips[1], nodes_of_descendants[l]]
-                  tree_mean$edge.length[which(tree_mean$edge[,2] == nodes_of_descendants[l])] = 
-                    dif_mean - dist.nodes(tree_mean)[tips[1], nodes_of_descendants[l]]
-                  tree_plus$edge.length[which(tree_plus$edge[,2] == nodes_of_descendants[l])] = 
-                    dif_plus - dist.nodes(tree_plus)[tips[1], nodes_of_descendants[l]]
+                  tree_minus$edge.length[which(tree_minus$edge[,2] == nodes_of_descendants[m])] = 
+                    dif_minus - dist.nodes(tree_minus)[tips[1], nodes_of_descendants[m]]
+                  tree_mean$edge.length[which(tree_mean$edge[,2] == nodes_of_descendants[m])] = 
+                    dif_mean - dist.nodes(tree_mean)[tips[1], nodes_of_descendants[m]]
+                  tree_plus$edge.length[which(tree_plus$edge[,2] == nodes_of_descendants[m])] = 
+                    dif_plus - dist.nodes(tree_plus)[tips[1], nodes_of_descendants[m]]
                 }
               }
             }
