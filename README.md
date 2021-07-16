@@ -36,21 +36,21 @@ bgPCA_ages(data_ages = all_dates, tree = topology, chosen_clades = 5, amount_of_
 The following results correspond to the output provided by running the example files as specified above. The two bgPCA axes separating the chronograms obtained under different loci sampling strategies explain 23.8% of total variance in node ages, while the bgPCA obtained for model of evolution explains 10.1%. This shows that the result of time-calibrated analyses is more sensitive to the choice of genes than to the evolutionary model implemented. Chronospaces showing the ditribution of chronograms along these axes are shown in Fig. 1.
 
 <br/><br/>
-![plot_chronospaces](https://github.com/mongiardino/chronospace/blob/main/figures/chronospace_example.pdf)
+![plot_chronospaces](https://github.com/mongiardino/chronospace/blob/main/figures/chronospace_example.jpg)
 **Fig. 1:** Chronospaces obtanied for separate bgPCAs separating chronograms based on the loci selected (**left**) and model of molecular evolution implemented (**right**). Proportion of total variance explained is shown in the axes labels. Clock-like loci seem to support the most distinct node ages, with loci sampled at random and based on their phylogenetic signal overlaping more (especially along bgPC 1 which accounts for most of the variance explained). 
 <br/><br/>
 
 The nodes most sensitive to the choice of loci include the two oldest nodes (Ambulacraria and Echinodermata in this case, see top 2 distributions on Fig. 2 left pannel). Interestingly clock-like genes support remarkably younger ages for these two ancient nodes relative to both random and signal-based sampling. The younger dates obtained when using clock-like loci are more congruent with the fossil record of these clades. On the other hand, the choice of model of molecular evolution induces smaller differences in the distribution of ages, with the site-heterogeneous model CAt+GTR supporting younger dates for all of these sensitive nodes.
 
 <br/><br/>
-![plot_sensitive_nodes](https://github.com/mongiardino/chronospace/blob/main/figures/nodes_most_affected_example.pdf)
+![plot_sensitive_nodes](https://github.com/mongiardino/chronospace/blob/main/figures/nodes_most_affected_example.jpg)
 **Fig. 2:** Most sensitive nodes found across analyses. These are identified by selecting two terminals at random from the two subcaled defined by each node. **Left**: Nodes changing the most between analyses run using different loci include, from top to bottom: the root of the tree (i.e., Ambulacraria, echinoderms + hemichordates), echinoderms, crinoids, and two clades within the ingroup (sea urchins). **Right**: Most sensitive nodes to the choice of model of molecular evolution.
 <br/><br/>
 
 Nodes can shift position through different mechanisms, a result that is generally difficult to visualize. By color coding branches given their degree of contraction/expansion along the different bgPCA axis, we can get a sense of how these different node ages are realized (Fig. 3). For example, the relatively young age of echinoderms found using clock-like genes seems to derive from multiple contractions of branch lengths surrounding that node, but interestingly not through changes of the amount of time inferred to have  separated the origin of echinoderms from that of ambulacrarians. Furthermore, clock-like loci infer older dates for almost all sea urchin nodes relative to samplling at random or based on phylogenetic signal.
 
 <br/><br/>
-![plot_sensitive_nodes](https://github.com/mongiardino/chronospace/blob/main/figures/branch_changes_1sd_example.pdf)
+![plot_sensitive_nodes](https://github.com/mongiardino/chronospace/blob/main/figures/branch_changes_1sd_example.jpg)
 **Fig. 3:** Contraction/expansion of branch lengths (see legend) induced by sampling different loci (**top**) or using different models of molecular evolution (**bottom**). Plots on the left correspond to a position at -1 sd along bgPC axis 1, those on the right to a position at +1 sd.
 <br/><br/>
 
