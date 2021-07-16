@@ -333,7 +333,7 @@ bgPCA_ages = function(data_ages, tree = NA, chosen_clades = NA, amount_of_change
     if(length(significant_axes) == 1) {
       ggsave('nodes_most_affected.pdf', plot = most_affected, width = width, height = 16, units = 'in')
     } else {
-      ggsave(paste0('nodes_most_affected.pdf_', colnames(groups)[significant_axes[i]], '.pdf'), 
+      ggsave(paste0('nodes_most_affected_', colnames(groups)[significant_axes[i]], '.pdf'), 
              plot = most_affected, width = width, height = 16, units = 'in')
     }
     
