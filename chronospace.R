@@ -347,7 +347,7 @@ bgPCA_ages = function(data_ages, tree = NA, chosen_clades = NA, amount_of_change
       
       #loop through the bgPCA axes (depending on the number of groups in the
       #variable being tested)
-      for(j in 1:num_functions) {
+      for(j in 1:1) { #expand to go from 1 to num_functions
         #create a tree that contains topology but no branch lengths
         tree$edge.length = rep(0, length(tree$edge.length))
         
@@ -438,9 +438,9 @@ bgPCA_ages = function(data_ages, tree = NA, chosen_clades = NA, amount_of_change
         #plot and save topologies implied by moving along the bgPCA axis, with
         #branch lengths color coded to reflect degree of expansion/shrinkage
         par(mfrow=c(1,2))
-        plot(tree_minus, show.tip.label = F, edge.width = 3, edge.color = palette[(length(tree$edge.length)+1):length(palette)])
+        plot(tree_plus, show.tip.label = F, edge.width = 3, edge.color = palette[(length(tree$edge.length)+1):length(palette)])
         add_time_lines()
-        plot(tree_plus, show.tip.label = F, edge.width = 3, edge.color = palette[1:length(tree$edge.length)])
+        plot(tree_minus, show.tip.label = F, edge.width = 3, edge.color = palette[1:length(tree$edge.length)])
         add_time_lines()
         
         obj = get("last_plot.phylo", envir = .PlotPhyloEnv)
