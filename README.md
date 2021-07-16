@@ -51,7 +51,7 @@ Nodes can shift position through different mechanisms, a result that is generall
 
 <br/><br/>
 ![plot_sensitive_nodes](https://github.com/mongiardino/chronospace/blob/main/figures/branch_changes_1sd_example.jpg)
-**Fig. 3:** Contraction/expansion of branch lengths (see legend) induced by sampling different loci (**top**) or using different models of molecular evolution (**bottom**). Plots on the left correspond to a position at -1 sd along bgPC axis 1, those on the right to a position at +1 sd.
+**Fig. 3:** Contraction/expansion of branch lengths (see legend) induced by sampling different loci (**top**) or using different models of molecular evolution (**bottom**). Plots on the left correspond to a position at -1 sd along bgPC axis 1, those on the right to a position at +1 sd. Vertical lines correspond to geological periods.
 <br/><br/>
 
 ## Citations
