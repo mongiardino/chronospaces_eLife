@@ -30,17 +30,19 @@ if(length(new_packages)) { install.packages(new_packages) }
 library(ape)
 library(phangorn)
 library(phytools)
-library(MASS)
-library(Morpho)
+library(MASS) #not needed
+library(Morpho) #not needed
 library(stringr)
 library(dplyr)
 library(ggplot2)
 library(ggpubr)
 library(plotrix)
 library(RColorBrewer)
+library(ggtree) #new
+library(patchwork) #new
 
 #Plotting functions-------------------------------------------------------------
-#add lines between geological periods
+#add lines between geological periods THIS IS NOW OBSOLETE
 add_time_lines = function() {
   obj <- get("last_plot.phylo", envir = .PlotPhyloEnv)
   t.max <- max(obj$xx)
@@ -154,187 +156,118 @@ extract_ages = function(type, sample) {
   return(data_ages)
 }
 
-#Run bgPCA-------------------------------------------------------------------
-bgPCA_ages = function(data_ages, tree = NA, chosen_clades = NA, amount_of_change = NA, sdev = 1) {
+
+# internal between-group PCA function ---------------------------------------------
+bgprcomp<-function(x, groups){
+  
+  grandmean<-colMeans(x)
+  x_centered<-scale(x, scale=F, center=T)
+  x_gmeans<-apply(X=x_centered, MARGIN=2, FUN=tapply, groups, mean)
+  
+  V_g<-cov(x_gmeans)
+  eig<-eigen(V_g)
+  
+  scores<-x_centered%*%eig$vectors
+  scores<-cbind(scores[,1:(nlevels(groups)-1)])
+  rotation<-eig$vectors
+  
+  preds<-scores %*% t(rotation[,1:ncol(scores)])
+  resids<-x - preds
+  
+  return(list(x=scores, residuals=resids, rotation=rotation, values=eig$values, 
+              center=grandmean, gmeans=x_gmeans))
+}
+
+
+#create chronospace-------------------------------------------------------------------
+chronospace = function(data_ages, tree = NA, sdev = 1, variation="Non-redundant", timemarks=NULL) {
   
   #split data.frame 'data_ages' into ages and factors
   ages = data_ages[,which(grepl('clade', colnames(data_ages)))]
   groups = data_ages[,which(grepl('factor', colnames(data_ages)))]
   
-  #perform MANOVA to check if decisions significantly affect nodes. I doubt
-  #anyone will simultaneously vary more than 5 parameters..
-  if(ncol(groups) == 1) manova = manova(as.matrix(ages) ~ groups)
-  if(ncol(groups) == 2) manova = manova(as.matrix(ages) ~ groups[,1] + 
-                                          groups[,2])
-  if(ncol(groups) == 3) manova = manova(as.matrix(ages) ~ groups[,1] + 
-                                          groups[,2] + groups[,3])
-  if(ncol(groups) == 4) manova = manova(as.matrix(ages) ~ groups[,1] + 
-                                          groups[,2] + groups[,3] + groups[,4])
-  if(ncol(groups) == 5) manova = manova(as.matrix(ages) ~ groups[,1] + 
-                                          groups[,2] + groups[,3] + 
-                                          groups[,4] + groups[,5])
+  #create object for storing overall results, assing names
+  results<-vector(mode="list", length=ncol(groups))
+  names(results)<-paste0("factor_", LETTERS[1:ncol(groups)])
   
-  #check which variables are significant and report results back
-  significant_axes = as.numeric(which(summary.manova(manova)[4]$stats[,6] < 0.5))
-  
-  if(ncol(groups) == 1) {
-    if(length(significant_axes) > 0) {
-      cat('The factor tested significantly affects divergence times')
-    } else {
-      cat('The factor tested does not significantly affect divergence times. Quiting.')
-    }
-  } else {
-    if(length(significant_axes) == 1) {
-      cat('Only', colnames(groups)[significant_axes], 'significantly affects divergence times')
-    } else {
-      if(length(significant_axes > 1)) {
-        cat(paste0(colnames(groups)[significant_axes], collapse = ' and '), 
-            'significantly affect divergence times')
-      } else {
-        cat('None of the factors tested significantly affect divergence times. Quiting.')
-      }
-    }
-  }
-  
-  #perform bgPCA on significant variables
-  for(i in 1:length(significant_axes)) {
-    bgPCA = groupPCA(ages, groups[,significant_axes[i]])
+  #perform bgPCA using each factor separately
+  for(i in 1:ncol(groups)) {
     
-    #report proportion of variance explained
+    #create object for storing results of factor i, assing names
+    results_i<-vector(mode="list", length=2)
+    names(results_i)<-c("chronospace", "PC_extremes")
+    
+    #perform bgPCA between groups defined by factor i over original variation
+    bgPCA1<-bgprcomp(x = ages, groups = groups[,i])
+    
+    #compute percentage of variation explained
+    totvar<-sum(apply(ages,2,var))
+    expvar<-sum(apply(bgPCA1$x,2,var))
+    perc_tot<-100*expvar/totvar
+    
+    #use bgPCA to compute an ordinaion that is residual to all factors but factor i
+    bgPCA2.1<-bgprcomp(x = ages, groups = groups[,-i])
+    resids2.1<-bgPCA2.1$residuals
+    
+    #perform bgPCA between groups defined by factor i over residual variation
+    bgPCA2.2<-bgprcomp(x =resids2.1, groups = groups[,i])
+    expvar2.2<-sum(apply(bgPCA2.2$x,2,var))
+    
+    #compute percentage of non-redundant variation explained 
+    perc_nonred<-100*expvar2.2/totvar
+    
+    #report proportion of original and non-redundant variantion explained
     cat(paste0('Proportion of variance explained by ', 
-               paste0('factor_', LETTERS[significant_axes[i]]), ' = ', 
-               round((bgPCA$combinedVar[max(which(grepl('bg', rownames(bgPCA$combinedVar)))),3]*100), 2), 
+               paste0('factor_', LETTERS[i]), ' = ', 
+               round(perc_tot, digits=3), 
+               '%', '\n'))
+    cat(paste0('Proportion of non-redundant variation explained by ', 
+               paste0('factor_', LETTERS[i]), ' = ', 
+               round(perc_nonred, digits=3), 
                '%', '\n'))
     
-    #obtain scores of trees along bgPC axis
-    scores = bgPCA$Scores
+    #select which bgPCA results are going to be used
+    if(variation=="Total") bgPCA <- bgPCA1
+    if(variation=="Non-redundant") bgPCA <- bgPCA2.2
     
     #set axes to either 1 (univariate plot) if the variable contains only two
     #groups, or 2 (bivariate plot) if it includes more groups
     num_functions = 1
-    if(ncol(scores) >= 2) num_functions = 2
+    if(ncol(bgPCA$x) >= 2) num_functions = 2
     
     #plot chronospace
     if(num_functions == 1) { #univariate
-      to_plot = data.frame(coordinates = scores, groups = unname(groups[significant_axes[i]]))
+      to_plot = data.frame(coordinates = bgPCA$x, groups = unname(groups[i]))
       colors_random = brewer.pal(7, 'Set3')[-2][sample(1:6, 2)]
       
       chronospace = ggplot(to_plot, aes(x = coordinates, fill = groups)) + 
         geom_histogram(alpha = 0.5, position = 'identity', bins = 30) + theme_bw() + 
         scale_fill_manual(values = colors_random) + ylab('Count') + 
-        theme(legend.title = element_blank()) +
-        xlab(paste0('bgPCA axis 1 (', round((bgPCA$combinedVar[1,2]*100), 2), '% of variance)'))
+        theme(legend.title = element_blank(), panel.grid = element_blank()) +
+        xlab(paste0('bgPCA axis 1 (', round((100*apply(bgPCA$x,2,var)[1]/totvar), 2), '% of variance)'))
       
     } else { #bivariate
-      to_plot = data.frame(coordinates = scores[,1:2], groups = unname(groups[significant_axes[i]]))
-      colors_random = brewer.pal(7, 'Set3')[-2][sample(1:6, nrow(unique(groups[significant_axes[i]])))]
+      to_plot = data.frame(coordinates = bgPCA$x[,1:2], groups = unname(groups[i]))
+      colors_random = brewer.pal(7, 'Set3')[-2][sample(1:6, nrow(unique(groups[i])))]
       
       chronospace = ggplot(to_plot, aes(x = coordinates.1, y = coordinates.2, color = groups)) + 
         geom_point(alpha = 0.5) + theme_bw() + scale_color_manual(values = colors_random) + 
-        xlab(paste0('bgPCA axis 1 (', round((bgPCA$combinedVar[1,2]*100), 2), '% of variance)')) + 
-        theme(legend.title = element_blank()) + 
-        ylab(paste0('bgPCA axis 2 (', round((bgPCA$combinedVar[2,2]*100), 2), '% of variance)'))
+        stat_conf_ellipse(aes(color = groups, fill = groups), alpha = 0.1, geom = "polygon") +
+        xlab(paste0('bgPCA axis 1 (', round((100*apply(bgPCA$x,2,var)[1]/totvar), 2), '% of variance)')) + 
+        theme(legend.title = element_blank(), panel.grid = element_blank()) + 
+        ylab(paste0('bgPCA axis 2 (', round((100*apply(bgPCA$x,2,var)[2]/totvar), 2), '% of variance)')) +
+        stat_ellipse(lwd=1.5)
     
+      ### note : these are NOT confidence ellipses but data ellipses
     }
     
-    #plot and save to working directory
-    plot(chronospace)
-    if(length(significant_axes) == 1) {
-      ggsave('chronospace.pdf', plot = chronospace, width = 10, height = 6, units = 'in')
-    } else {
-      ggsave(paste0('chronospace_', colnames(groups)[significant_axes[i]], '.pdf'), 
-             plot = chronospace, width = 10, height = 6, units = 'in')
-    }
-    
-    #plot the posterior distribution of nodes with the strongest differences
-    #between runs
-    
-    #first decide how many nodes will be plotted
-    #if an minimum amount of change is specified, go with it
-    if(!is.na(amount_of_change)) {
-      num_nodes = length(which((apply(bgPCA$groupmeans, 2, max) - 
-                                  apply(bgPCA$groupmeans, 2, min)) > amount_of_change))
-      
-      #reduce to a max of 20,or plot 5 if none changes by the specified amount
-      if(num_nodes > 20) num_nodes = 20
-      if(num_nodes == 0) num_nodes = 5
-      
-    } else { #if a minimum amount is not specified
-      #if a number of clades is not specified, do 5
-      if(is.na(chosen_clades)) {
-        num_nodes = 5
-      } else {
-        #else go with what the user chose, although cap at 20
-        num_nodes = chosen_clades
-      }
-      if(num_nodes > 20) num_nodes = 20
-    }
+    #save chronospace
+    results_i$chronospace<-chronospace
     
     #obtain clades from tree
     clades = list()
     for(j in 1:tree$Nnode) {
       clades[j] = list(tree$tip.label[unlist(Descendants(tree, length(tree$tip.label)+j, type = 'tips'))])
-    }
-    
-    #make room to save the individual plots
-    plots = vector(mode = "list", length = num_nodes)
-    
-    #loop through the nodes
-    for(j in 1:num_nodes) {
-      #sort clades starting by those that vary the most between analyses and
-      #choose clade j
-      clade = which(sort((apply(bgPCA$groupmeans, 2, max)-apply(bgPCA$groupmeans, 2, min)), decreasing = T)[j] == 
-                        (apply(bgPCA$groupmeans, 2, max)-apply(bgPCA$groupmeans, 2, min)))
-      
-      #obtain corresponding node number and the descendant taxa
-      node = mrca.phylo(tree, clades[[clade]])
-      desc = Descendants(tree, node = node, type = 'children')
-      
-      #obtain representative taxa from either side of the split
-      for(k in 1:length(desc)) {
-        #if it is a tip, extract the name
-        if(as.numeric(desc[k]) <= length(tree$tip.label)) {
-          desc[k] = tree$tip.label[as.numeric(desc[k])]
-          #else choose a random tip from the descendant clade
-        } else {
-          desc[k] = tree$tip.label[sample(unlist(Descendants(tree, node = as.numeric(desc[k]), type = 'tips')), 1)]
-        }
-      }
-      
-      #make the plot
-      to_plot = data.frame(age = ages[,clade], group = unname(groups[significant_axes[i]]))
-      plots[[j]] = ggplot(to_plot, aes(x = -age, color = group)) + geom_density(alpha = 0.3, size = 2) + 
-        theme_bw() + scale_color_manual(values = colors_random) + 
-        theme(plot.title = element_text(size = 8)) + 
-        scale_x_continuous(breaks = pretty(-to_plot$age), labels = abs(pretty(-to_plot$age))) + 
-        xlab('Age of MRCA') + ylab('Density')
-      
-      if(length(unique(to_plot$group)) == 2) {
-        plots[[j]] = plots[[j]] + ggtitle(paste0('MRCA of ', desc[1], ' and ', desc[2], 
-                                                 ' (difference = ', 
-                                                 round((max(bgPCA$groupmeans[,clade])-min(bgPCA$groupmeans[,clade])), 1), 
-                                                 ' Ma)'))
-      } else {
-        plots[[j]] = plots[[j]] + ggtitle(paste0('MRCA of ', desc[1], ' and ', desc[2], 
-                                                 ' (max difference = ', 
-                                                 round((max(bgPCA$groupmeans[,clade])-min(bgPCA$groupmeans[,clade])), 1), 
-                                                 ' Ma)'))
-      }
-    }
-    
-    #plot and save, accounting for a varying number of columns depending on the
-    #nodes plotted
-    most_affected = plot(annotate_figure(ggarrange(plotlist = plots, 
-                                                   common.legend = T, legend = 'bottom', 
-                                                   ncol = ceiling(num_nodes/5), nrow = 5)))
-    plot(most_affected)
-    
-    width = (ceiling(num_nodes/5))*4 + 9
-    if(length(significant_axes) == 1) {
-      ggsave('nodes_most_affected.pdf', plot = most_affected, width = width, height = 16, units = 'in')
-    } else {
-      ggsave(paste0('nodes_most_affected_', colnames(groups)[significant_axes[i]], '.pdf'), 
-             plot = most_affected, width = width, height = 16, units = 'in')
     }
     
     #Finally, compute changes in each branch captured by the bgPCA axes (needs a
@@ -343,18 +276,22 @@ bgPCA_ages = function(data_ages, tree = NA, chosen_clades = NA, amount_of_change
       cat('Plotting changes on branch lengths can only be shown if a tree is provided\n')
     } else {
       #ages implied by a position at the origin of the bgPCA plot
-      mean = matrix(bgPCA$Grandmean, ncol = 1)
+      mean = matrix(colMeans(ages), ncol = 1)
+      
+      #creeate object for storing the extremes of the bgPC j
+      PCextremes<-vector(mode="list", length=num_functions)
       
       #loop through the bgPCA axes (depending on the number of groups in the
       #variable being tested)
-      for(j in 1:1) { #expand to go from 1 to num_functions
+      for(j in 1:num_functions) {
+        
         #create a tree that contains topology but no branch lengths
         tree$edge.length = rep(0, length(tree$edge.length))
         
         #ages implied by moving along this bgPCA axis 'sdev' number of standard
         #deviations to both sides
-        assign(paste0('plus_sd_', j), showPC(sdev*sd(scores[,j]), bgPCA$groupPCs[,j], mean))
-        assign(paste0('minus_sd_', j), showPC(-sdev*sd(scores[,j]), bgPCA$groupPCs[,j], mean))
+        assign(paste0('plus_sd_', j), showPC(sdev*sd(bgPCA$x[,j]), bgPCA$rotation[,j], mean))
+        assign(paste0('minus_sd_', j), showPC(-sdev*sd(bgPCA$x[,j]), bgPCA$rotation[,j], mean))
         
         #check number of descendants stemming from each node
         clade_size = unlist(lapply(clades, length))
@@ -426,37 +363,162 @@ bgPCA_ages = function(data_ages, tree = NA, chosen_clades = NA, amount_of_change
           }
         }
         
-        #express changes in away suitable for a legend
+        #compute delta in branch lengths between the mean tree and the positive and negative extremes
         changes_plus = tree_plus$edge.length - tree_mean$edge.length
-        changes_plus_plot = (changes_plus - min(changes_plus))/(max(changes_plus) - min(changes_plus))
         changes_minus = tree_minus$edge.length - tree_mean$edge.length
-        changes_minus_plot = (changes_minus - min(changes_minus))/(max(changes_minus) - min(changes_minus))
         
-        pal = colorRamp(c('blue', 'grey', 'red')) 
-        palette = rgb(pal(c(changes_plus_plot, changes_minus_plot)), max = 255)
+        #if time marks have been specified, use them to  draw vertical lines in the corresponding tree
+        if(!is.null(timemarks)){
+          t.max<-max(nodeHeights(tree_minus))
+          timemarks1.1 <- timemarks[which(timemarks <= t.max)]
+          timemarks1.2<-t.max-timemarks1.1
+          
+          t.max<-max(nodeHeights(tree_plus))
+          timemarks2.1 <- timemarks[which(timemarks <= t.max)]
+          timemarks2.2<-t.max-timemarks2.1} else {timemarks1.2<-timemarks2.2<-NULL  }
         
-        #plot and save topologies implied by moving along the bgPCA axis, with
-        #branch lengths color coded to reflect degree of expansion/shrinkage
-        par(mfrow=c(1,2))
-        plot(tree_plus, show.tip.label = F, edge.width = 3, edge.color = palette[(length(tree$edge.length)+1):length(palette)])
-        add_time_lines()
-        plot(tree_minus, show.tip.label = F, edge.width = 3, edge.color = palette[1:length(tree$edge.length)])
-        add_time_lines()
+        #convert phylo trees into ggtrees, adding delta in branch length to the metadata
+        tree_plus_gg<-ggtree(tree_plus, size=1.5) %<+% data.frame(node=tree_plus$edge[,2], delta=changes_plus)
+        tree_minus_gg<-ggtree(tree_minus, size=1.5) %<+% data.frame(node=tree_minus$edge[,2], delta=changes_minus)
         
-        obj = get("last_plot.phylo", envir = .PlotPhyloEnv)
-        t.max = max(obj$xx)
+        #create graphics for each extreme of the bgPC j
+        negative<-tree_minus_gg + aes(color=delta) + 
+          scale_color_gradient2(limits = range(c(changes_minus, changes_plus)),
+                                high="red", low="blue", mid="gray", midpoint=0) +
+          ggtitle(paste0("Factor ", LETTERS[i], " - bgPC", j, ", negative extreme")) +
+          theme(plot.title = element_text(hjust = 0.5)) +
+          geom_vline(xintercept = timemarks1.2, lty=2, col="gray")
         
-        color.legend(t.max-(t.max*0.5), 60, t.max, 63, rect.col = rgb(pal(seq(0,1,0.1)), max = 255), cex = 0.6, 
-                     legend = round(seq(min(c(changes_plus, changes_minus)), max(c(changes_plus, changes_minus)), 
-                                        ((max(c(changes_plus, changes_minus))-min(c(changes_plus, changes_minus)))/10)), 1))
+        positive<-tree_plus_gg + aes(color=delta) + 
+          scale_color_gradient2(limits = range(c(changes_minus, changes_plus)),
+                                high="red", low="blue", mid="gray", midpoint=0) +
+          ggtitle(paste0("Factor ", LETTERS[i], " - bgPC", j, ", positive extreme")) +
+          theme(plot.title = element_text(hjust = 0.5)) +
+          geom_vline(xintercept = timemarks2.2, lty=2, col="gray")
         
-        if(length(significant_axes) == 1) {
-          dev.copy2pdf(file = paste0('branch_changes_', sdev, 'sd.pdf'), width = 16, height = 12)
+        #combine both into a single graphic and store
+        PCextremes[[j]]<-negative + positive + plot_layout(guides = "collect") & 
+          theme(legend.position="bottom")
+        
+      }
+      
+      #assign list names and save
+      names(PCextremes)<-paste0("bgPC", 1:j)
+      results_i$PC_extremes<-PCextremes
+      
+    }
+    
+    #add to overall results list
+    results[[i]]<-results_i
+    
+  }
+  
+  return(results)
+  
+}
+
+#get senstive nodes ----------------------------------------------------
+senstitive_nodes<-function(data_ages, tree, amount_of_change, chosen_clades, variation){
+  
+  #split data.frame 'data_ages' into ages and factors
+  ages = data_ages[,which(grepl('clade', colnames(data_ages)))]
+  groups = data_ages[,which(grepl('factor', colnames(data_ages)))]
+  
+  #create object for storing overall results, assing names
+  results<-vector(mode="list", length=ncol(groups))
+  names(results)<-paste0("factor_", LETTERS[1:ncol(groups)])
+  
+  #perform bgPCA on each variable
+  for(i in 1:ncol(groups)) {
+    
+    bgPCA <-bgprcomp(x = ages, groups = groups[,i])
+    
+    #plot the posterior distribution of nodes with the strongest differences
+    #between runs
+    
+    #first decide how many nodes will be plotted
+    #if an minimum amount of change is specified, go with it
+    if(!is.na(amount_of_change)) {
+      num_nodes = length(which((apply(bgPCA$gmeans, 2, max) -
+                                  apply(bgPCA$gmeans, 2, min)) > amount_of_change))
+      
+      #reduce to a max of 20,or plot 5 if none changes by the specified amount
+      if(num_nodes > 20) num_nodes = 20
+      if(num_nodes == 0) num_nodes = 5
+      
+    } else { #if a minimum amount is not specified
+      #if a number of clades is not specified, do 5
+      if(is.na(chosen_clades)) {
+        num_nodes = 5
+      } else {
+        #else go with what the user chose, although cap at 20
+        num_nodes = chosen_clades
+      }
+      if(num_nodes > 20) num_nodes = 20
+    }
+    
+    #obtain clades from tree
+    clades = list()
+    for(j in 1:tree$Nnode) {
+      clades[j] = list(tree$tip.label[unlist(Descendants(tree, length(tree$tip.label)+j, type = 'tips'))])
+    }
+    
+    #make room to save the individual plots
+    plots = vector(mode = "list", length = num_nodes)
+    
+    #loop through the nodes
+    for(j in 1:num_nodes) {
+      
+      #sort clades starting by those that vary the most between analyses and
+      #choose clade j
+      clade = which(sort((apply(bgPCA$gmeans, 2, max)-apply(bgPCA$gmeans, 2, min)), decreasing = T)[j] ==
+                      (apply(bgPCA$gmeans, 2, max)-apply(bgPCA$gmeans, 2, min)))
+      
+      
+      #obtain corresponding node number and the descendant taxa
+      node = mrca.phylo(tree, clades[[clade]])
+      desc = Descendants(tree, node = node, type = 'children')
+      
+      #obtain representative taxa from either side of the split
+      for(k in 1:length(desc)) {
+        #if it is a tip, extract the name
+        if(as.numeric(desc[k]) <= length(tree$tip.label)) {
+          desc[k] = tree$tip.label[as.numeric(desc[k])]
+          #else choose a random tip from the descendant clade
         } else {
-          dev.copy2pdf(file = paste0('branch_changes_', sdev, 'sd_', colnames(groups)[significant_axes[i]], '.pdf'), 
-                       width = 16, height = 12)
+          desc[k] = tree$tip.label[sample(unlist(Descendants(tree, node = as.numeric(desc[k]), type = 'tips')), 1)]
         }
       }
+      
+      #make the plot
+      to_plot = data.frame(age = ages[,clade], group = unname(groups[i]))
+      plots[[j]] = ggplot(to_plot, aes(x = -age, color = group)) + geom_density(alpha = 0.3, size = 2) +
+        theme_bw() + scale_color_manual(values = colors_random) +
+        theme(plot.title = element_text(size = 8)) +
+        scale_x_continuous(breaks = pretty(-to_plot$age), labels = abs(pretty(-to_plot$age))) +
+        xlab('Age of MRCA') + ylab('Density')
+      
+      if(length(unique(to_plot$group)) == 2) {
+        plots[[j]] = plots[[j]] + ggtitle(paste0('MRCA of ', desc[1], ' and ', desc[2],
+                                                 ' (difference = ',
+                                                 round((max(bgPCA$gmeans[,clade])-min(bgPCA$gmeans[,clade])), 1),
+                                                 ' Ma)'))
+      } else {
+        plots[[j]] = plots[[j]] + ggtitle(paste0('MRCA of ', desc[1], ' and ', desc[2],
+                                                 ' (max difference = ',
+                                                 round((max(bgPCA$gmeans[,clade])-min(bgPCA$gmeans[,clade])), 1),
+                                                 ' Ma)'))
+      }
     }
+    
+    #plot and save, accounting for a varying number of columns depending on the
+    #nodes plotted
+    most_affected = annotate_figure(ggarrange(plotlist = plots,
+                                              common.legend = T, legend = 'bottom',
+                                              ncol = ceiling(num_nodes/5), nrow = 5))
+    #plot(most_affected)
+    results[[i]]<-most_affected
   }
+  
+  return(results)
 }
