@@ -21,25 +21,23 @@
 #3) a summary of the effect of different choices on all branch lengths.
 
 #Install and load packages------------------------------------------------------
-packages <- c('ape','phangorn','phytools',
-              'MASS','Morpho',
-              'stringr','dplyr','ggplot2','ggpubr','plotrix','RColorBrewer')
+packages <- c('ape', 'phangorn', 'phytools',
+              'stringr', 'dplyr', 
+              'ggplot2', 'ggpubr', 'plotrix', 'RColorBrewer', 'ggtree', 'patchwork')
 new_packages <- packages[!packages %in% installed.packages()[,'Package']]
 if(length(new_packages)) { install.packages(new_packages) }
 
 library(ape)
 library(phangorn)
 library(phytools)
-library(MASS) #not needed
-library(Morpho) #not needed
 library(stringr)
 library(dplyr)
 library(ggplot2)
 library(ggpubr)
 library(plotrix)
 library(RColorBrewer)
-library(ggtree) #new
-library(patchwork) #new
+library(ggtree)
+library(patchwork)
 
 #Plotting functions-------------------------------------------------------------
 #add lines between geological periods THIS IS NOW OBSOLETE
@@ -66,12 +64,16 @@ times <- c(2.588, 23.03, 66, 145, 201.3, 252.17, 298.9,
            252.17, 358.9, 419.2, 443.8, 485.4, 541, 4600)
 
 #load files---------------------------------------------------------------------
-extract_ages <- function(type, sample) {
+extract_ages <- function(directory = NA, type, sample) {
   
   #obtain the names of all files in the working directory (these should all be
   #newick tree files corresponding to Bayesian posterior distributions of
   #time-calibrated analyses with constrained topology)
-  files = list.files()
+  if(is.na(directory)) {
+    files = list.files()
+  } else {
+    files = list.files(path = directory)
+  }
   
   #check that tree files and factors provided in 'types' match correctly
   cat("Check that labels are assigned correctly to the input files.\n", 
