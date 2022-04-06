@@ -612,3 +612,52 @@ sensitive_nodes <- function(obj, tree, amount_of_change, factors=1:length(obj),
   factors<-factors[!factors>length(results)]
   return(results[factors])
 }
+
+#LTT by group-------------------------------------------------------------------
+ltt_sensitivity <- function(data_ages, average = 'median') {
+  ages <- data_ages[,which(grepl('clade', colnames(data_ages)))]
+  groups <- data_ages[,which(grepl('factor', colnames(data_ages)))]
+  plots <- vector(mode = "list", length = ncol(groups))
+  
+  for(i in 1:ncol(groups)) {
+    sample <- nrow(groups)/length(unique(groups[,i]))
+    num_nodes <- ncol(ages)
+    
+    this_ages <- apply(ages, 1, sort)
+    this_groups <- groups[,i]
+    this_order <- order(this_groups)
+    
+    this_ages <- this_ages[,this_order]
+    this_groups <- this_groups[this_order]
+    
+    colnames(this_ages) <- 1:ncol(this_ages)
+    this_ages <- pivot_longer(as.tibble(this_ages), 1:ncol(this_ages)) %>% 
+      mutate(name = as.numeric(name)) %>% arrange(name, desc(value)) %>%
+      mutate(type = rep(as.character(unique(this_groups)), 
+                        each = sample * num_nodes), 
+             num_lineages = rep(2:(num_nodes + 1), length(this_groups)))
+    
+    if(average == 'mean') {
+      ages_average <- this_ages %>% group_by(type, num_lineages) %>% 
+        summarise(av_value = mean(value), .groups = 'drop')
+    }
+    if(average == 'median') {
+      ages_average <- this_ages %>% group_by(type, num_lineages) %>% 
+        summarise(av_value = median(value), .groups = 'drop')
+    }
+    
+    to_add <- ages_average %>% mutate(num_lineages = num_lineages - 1)
+    ages_average <- rbind(ages_average, to_add) %>% arrange(type, num_lineages)
+    
+    plots[[i]] <- ggplot(ages_average, aes(x = av_value, y = num_lineages, color = type)) + 
+      geom_line(alpha = 0.3, size = 2) + scale_y_log10() + scale_x_reverse() + 
+      theme_bw() + xlab('Age (Ma)') + ylab('Number of lineages')
+  }
+  
+  ltts <- annotate_figure(ggarrange(plotlist = plots, 
+                                    common.legend = F, legend = 'bottom', 
+                                    ncol = ncol(groups), nrow = 1))
+  
+  return(ltts)
+  
+}
