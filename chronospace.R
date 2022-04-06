@@ -260,12 +260,12 @@ chronospace <- function(data_ages, tree = NA, sdev = 1, distances=FALSE,
       
       if(!distances){
         chronospace <- ggplot(to_plot, aes(x = coordinates.1, y = coordinates.2, color = groups)) + 
-          geom_point(alpha = 0.5) + theme_bw() + scale_color_manual(values = colors) + 
-          stat_conf_ellipse(aes(color = groups, fill = groups), alpha = 0.1, geom = "polygon") +
+          geom_point(alpha = 0.5, key_glyph = "point") + theme_bw() + scale_color_manual(values = colors) + 
           xlab(paste0('bgPCA axis 1 (', round((100*apply(bgPCA$x,2,var)[1]/totvar), 2), '% of variance)')) + 
           theme(legend.title = element_blank(), panel.grid = element_blank()) + 
           ylab(paste0('bgPCA axis 2 (', round((100*apply(bgPCA$x,2,var)[2]/totvar), 2), '% of variance)')) +
-          stat_ellipse(lwd=1.5)
+          stat_ellipse(lwd=1.5, key_glyph = "point") + 
+          guides(colour = guide_legend(override.aes = list(alpha=1, shape=21, color="black", fill = colors, size=3.5)))
         
         ### note : these are NOT confidence ellipses but data ellipses
       } else {
