@@ -190,8 +190,9 @@ revPCA<-function(scores, vectors, center){ t(t(scores%*%t(vectors))+center) }
 chronospace <- function(data_ages, factors, tree = NA, sdev = 1, distances=FALSE,
                         variation = "non-redundant", timemarks = NULL) {
   
+  #set objects
   ages <- data_ages
-  groups <- factors
+  if(is.null(dim(factors))) groups <- data.frame(factor_A=factors) else groups <- factors
   
   #factors names
   facnames<-colnames(groups)
@@ -215,30 +216,34 @@ chronospace <- function(data_ages, factors, tree = NA, sdev = 1, distances=FALSE
     expvar <- sum(apply(bgPCA1$x, 2, var))
     perc_tot <- 100 * (expvar/totvar)
     
-    #use bgPCA to compute an ordinaion that is residual to all factors but factor i
-    bgPCA2.1 <- bgprcomp(x = ages, groups = groups[,-i])
-    resids2.1 <- bgPCA2.1$residuals
-    
-    #perform bgPCA between groups defined by factor i over residual variation
-    bgPCA2.2 <- bgprcomp(x = resids2.1, groups = groups[,i])
-    expvar2.2 <- sum(apply(bgPCA2.2$x, 2, var))
-    
-    #compute percentage of non-redundant variation explained 
-    perc_nonred <- 100 * (expvar2.2/totvar)
-    
-    #report proportion of original and non-redundant variation explained
+    #report proportion of total variation explained
     cat(paste0('Proportion of total variation in node ages explained by ', 
                facnames[i], ' = ', 
                round(perc_tot, digits=3), 
                '%', '\n'))
-    cat(paste0('Proportion of non-redundant variation in node ages explained by ', 
-               facnames[i], ' = ', 
-               round(perc_nonred, digits=3), 
-               '%', '\n'))
+    
+    if(ncol(groups)>1){
+      #use bgPCA to compute an ordinaion that is residual to all factors but factor i
+      bgPCA2.1 <- bgprcomp(x = ages, groups = groups[,-i])
+      resids2.1 <- bgPCA2.1$residuals
+      
+      #perform bgPCA between groups defined by factor i over residual variation
+      bgPCA2.2 <- bgprcomp(x = resids2.1, groups = groups[,i])
+      expvar2.2 <- sum(apply(bgPCA2.2$x, 2, var))
+      
+      #compute percentage of non-redundant variation explained 
+      perc_nonred <- 100 * (expvar2.2/totvar)
+      
+      #report proportion of non-redundant variation explained
+      cat(paste0('Proportion of non-redundant variation in node ages explained by ', 
+                 facnames[i], ' = ', 
+                 round(perc_nonred, digits=3), 
+                 '%', '\n'))
+    } else {cat('(There is only one factor, non-redundant variation omitted)\n')}
     
     #select which bgPCA results are going to be used
-    if(variation == "total") bgPCA <- bgPCA1
-    if(variation == "non-redundant") bgPCA <- bgPCA2.2
+    if(variation == "total" | ncol(groups)==1) bgPCA <- bgPCA1
+    if(variation == "non-redundant" & ncol(groups)>1) bgPCA <- bgPCA2.2
     
     #set axes to either 1 (univariate plot) if the variable contains only two
     #groups, or 2 (bivariate plot) if it includes more groups
