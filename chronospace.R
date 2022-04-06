@@ -253,7 +253,7 @@ chronospace <- function(data_ages, factors, variation = "non-redundant")  {
 
 #plot chronospace-------------------------------------------------------------------
 plot.chronospace<-function(obj, tree=NA, sdev=1, timemarks = NULL,
-                           colors=1:4, factors=length(obj), axes=c(1,2), pt.alpha=0.5, pt.size=1.5, ell.width=1.2, dist.width=1, ct.size=5,
+                           colors=1:5, factors=1:length(obj), axes=c(1,2), pt.alpha=0.5, pt.size=1.5, ell.width=1.2, dist.width=1, ct.size=5,
                            ellipses=TRUE, centroids=FALSE, distances=FALSE) {
   
   if(length(axes)!=2) axes<-c(1,2)
@@ -502,21 +502,20 @@ plot.chronospace<-function(obj, tree=NA, sdev=1, timemarks = NULL,
 }
 
 #get senstive nodes ----------------------------------------------------
-senstitive_nodes <- function(data_ages, tree, amount_of_change, 
-                             chosen_clades, variation){
+sensitive_nodes <- function(obj, tree, amount_of_change, factors=1:length(obj), 
+                             chosen_clades, colors=1:5){
   
-  #split data.frame 'data_ages' into ages and factors
-  ages <- data_ages[,which(grepl('clade', colnames(data_ages)))]
-  groups <- data_ages[,which(grepl('factor', colnames(data_ages)))]
-  
-  #create object for storing overall results, assing names
-  results <- vector(mode = "list", length = ncol(groups))
-  names(results) <- paste0("factor_", LETTERS[1:ncol(groups)])
+  #create object for storing overall results, assign names
+  results <- vector(mode = "list", length = length(obj))
+  names(results) <- names(obj)
   
   #perform bgPCA on each variable
-  for(i in 1:ncol(groups)) {
+  for(i in 1:length(obj)) {
     
-    bgPCA <- bgprcomp(x = ages, groups = groups[,i])
+    #extract information for factor i
+    bgPCA <- obj[[i]]
+    groups <- bgPCA$groups
+    ages <- bgPCA$ages
     
     #plot the posterior distribution of nodes with the strongest differences
     #between runs
@@ -578,10 +577,10 @@ senstitive_nodes <- function(data_ages, tree, amount_of_change,
       }
       
       #make the plot
-      to_plot <- data.frame(age = ages[,clade], group = unname(groups[i]))
+      to_plot <- data.frame(age = ages[,clade], group = groups)
       plots[[j]] <- ggplot(to_plot, aes(x = -age, color = group)) + 
         geom_density(alpha = 0.3, size = 2) +
-        theme_bw() + scale_color_manual(values = colors_random) +
+        theme_bw() + scale_color_manual(values = colors) +
         theme(plot.title = element_text(size = 8)) +
         scale_x_continuous(breaks = pretty(-to_plot$age), labels = abs(pretty(-to_plot$age))) +
         xlab('Age of MRCA') + ylab('Density')
@@ -610,5 +609,6 @@ senstitive_nodes <- function(data_ages, tree, amount_of_change,
     results[[i]] <- most_affected
   }
   
-  return(results)
+  factors<-factors[!factors>length(results)]
+  return(results[factors])
 }
