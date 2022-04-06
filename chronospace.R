@@ -186,23 +186,25 @@ revPCA<-function(scores, vectors, center){ t(t(scores%*%t(vectors))+center) }
 
 
 #create chronospace-------------------------------------------------------------------
-chronospace <- function(data_ages, tree = NA, sdev = 1, distances=FALSE,
+chronospace <- function(data_ages, factors, tree = NA, sdev = 1, distances=FALSE,
                         variation = "non-redundant", timemarks = NULL) {
   
-  #split data.frame 'data_ages' into ages and factors
-  ages <- data_ages[,which(grepl('clade', colnames(data_ages)))]
-  groups <- data_ages[,which(grepl('factor', colnames(data_ages)))]
+  ages <- data_ages
+  groups <- factors
+  
+  #factors names
+  facnames<-colnames(groups)
   
   #create object for storing overall results, assign names
   results <- vector(mode = "list", length = ncol(groups))
-  names(results) <- paste0("factor_", LETTERS[1:ncol(groups)])
+  names(results) <- facnames
   
   #perform bgPCA using each factor separately
   for(i in 1:ncol(groups)) {
     
     #create object for storing results of factor i, assing names
     results_i <- vector(mode = "list", length = 2)
-    names(results_i) <- c("chronospace", "PC_extremes")
+    names(results_i) <- c("ordination", "PC_extremes")
     
     #perform bgPCA between groups defined by factor i over original variation
     bgPCA1 <- bgprcomp(x = ages, groups = groups[,i])
@@ -224,13 +226,13 @@ chronospace <- function(data_ages, tree = NA, sdev = 1, distances=FALSE,
     perc_nonred <- 100 * (expvar2.2/totvar)
     
     #report proportion of original and non-redundant variation explained
-    cat(paste0('Proportion of variance explained by ', 
-               paste0('factor_', LETTERS[i]), ' = ', 
+    cat(paste0('Proportion of total variation in node ages explained by ', 
+               facnames[i], ' = ', 
                round(perc_tot, digits=3), 
                '%', '\n'))
-    cat(paste0('Proportion of non-redundant variation explained by ', 
+    cat(paste0('Proportion of non-redundant variation in node ages explained by ', 
                paste0('factor_', LETTERS[i]), ' = ', 
-               round(perc_nonred, digits=3), 
+               facnames[i], ' = ', 
                '%', '\n'))
     
     #select which bgPCA results are going to be used
@@ -298,13 +300,13 @@ chronospace <- function(data_ages, tree = NA, sdev = 1, distances=FALSE,
         
         chronospace <- chronospace + 
           geom_point(shape=21, data=df, color="black", fill = colors, aes(x = coordinates.1, y = coordinates.2), size=5) +
-          guides(colour = guide_legend(override.aes = list(alpha = 1, shape=16, size=3)))
+          guides(colour = guide_legend(override.aes = list(alpha=1, shape=21, color="black", fill = colors, size=3.5)))
         
       }
     }
     
     #save chronospace
-    results_i$chronospace <- chronospace
+    results_i$ordination <- chronospace
     
     #obtain clades from tree
     clades <- list()
@@ -433,14 +435,14 @@ chronospace <- function(data_ages, tree = NA, sdev = 1, distances=FALSE,
         negative <- tree_minus_gg + aes(color=delta) + 
           scale_color_gradient2(limits = range(c(changes_minus, changes_plus)),
                                 high = "red", low = "blue", mid = "gray", midpoint = 0) +
-          ggtitle(paste0("Factor ", LETTERS[i], " - bgPC", j, ", negative extreme")) +
+          ggtitle(paste0(facnames[i], " - bgPC", j, ", negative extreme")) +
           theme(plot.title = element_text(hjust = 0.5)) +
           geom_vline(xintercept = timemarks1.2, lty = 2, col = "gray")
         
         positive <- tree_plus_gg + aes(color = delta) + 
           scale_color_gradient2(limits = range(c(changes_minus, changes_plus)),
                                 high = "red", low = "blue", mid = "gray", midpoint = 0) +
-          ggtitle(paste0("Factor ", LETTERS[i], " - bgPC", j, ", positive extreme")) +
+          ggtitle(paste0(facnames[i], " - bgPC", j, ", positive extreme")) +
           theme(plot.title = element_text(hjust = 0.5)) +
           geom_vline(xintercept = timemarks2.2, lty = 2, col = "gray")
         
