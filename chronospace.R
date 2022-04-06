@@ -232,8 +232,8 @@ chronospace <- function(data_ages, factors, tree = NA, sdev = 1, distances=FALSE
                round(perc_tot, digits=3), 
                '%', '\n'))
     cat(paste0('Proportion of non-redundant variation in node ages explained by ', 
-               paste0('factor_', LETTERS[i]), ' = ', 
                facnames[i], ' = ', 
+               round(perc_nonred, digits=3), 
                '%', '\n'))
     
     #select which bgPCA results are going to be used
