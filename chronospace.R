@@ -64,15 +64,16 @@ times <- c(2.588, 23.03, 66, 145, 201.3, 252.17, 298.9,
            252.17, 358.9, 419.2, 443.8, 485.4, 541, 4600)
 
 #load files---------------------------------------------------------------------
-extract_ages <- function(directory = NA, type, sample) {
+extract_ages <- function(path = NA, type, sample) {
   
-  #obtain the names of all files in the working directory (these should all be
-  #newick tree files corresponding to Bayesian posterior distributions of
-  #time-calibrated analyses with constrained topology)
-  if(is.na(directory)) {
-    files = list.files()
+  #Obtain the names of all files in the specified directory (or the working
+  #directory otherwise). These should all be newick tree files corresponding to
+  #Bayesian posterior distributions of time-calibrated analyses with constrained
+  #topology.
+  if(is.na(path)) {
+    files <- list.files()
   } else {
-    files = list.files(path = directory)
+    files <- list.files(path = path)
   }
   
   #check that tree files and factors provided in 'types' match correctly
