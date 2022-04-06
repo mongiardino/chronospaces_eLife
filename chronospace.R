@@ -187,12 +187,11 @@ revPCA<-function(scores, vectors, center){ t(t(scores%*%t(vectors))+center) }
 
 
 #create chronospace-------------------------------------------------------------------
-chronospace <- function(data_ages, factors, tree = NA, sdev = 1, distances=FALSE,
-                        variation = "non-redundant", timemarks = NULL) {
+chronospace <- function(data_ages, factors, variation = "non-redundant")  {
   
   #set objects
   ages <- data_ages
-  if(is.null(dim(factors))) groups <- data.frame(factor_A=factors) else groups <- factors
+  if(is.null(dim(factors))) groups <- data.frame(factor=factors) else groups <- factors
   
   #factors names
   facnames<-colnames(groups)
@@ -203,10 +202,6 @@ chronospace <- function(data_ages, factors, tree = NA, sdev = 1, distances=FALSE
   
   #perform bgPCA using each factor separately
   for(i in 1:ncol(groups)) {
-    
-    #create object for storing results of factor i, assing names
-    results_i <- vector(mode = "list", length = 2)
-    names(results_i) <- c("ordination", "PC_extremes")
     
     #perform bgPCA between groups defined by factor i over original variation
     bgPCA1 <- bgprcomp(x = ages, groups = groups[,i])
@@ -245,15 +240,51 @@ chronospace <- function(data_ages, factors, tree = NA, sdev = 1, distances=FALSE
     if(variation == "total" | ncol(groups)==1) bgPCA <- bgPCA1
     if(variation == "non-redundant" & ncol(groups)>1) bgPCA <- bgPCA2.2
     
+    #store bgPCA results, along with total variation and groups of factor i
+    bgPCA$totvar<-totvar
+    bgPCA$groups<-groups[,i]
+    bgPCA$ages<-ages
+    results[[i]]<-bgPCA
+  }
+  
+  return(invisible(results))
+}
+
+
+#plot chronospace-------------------------------------------------------------------
+plot.chronospace<-function(obj, tree=NA, sdev=1, timemarks = NULL,
+                           colors=1:4, factors=length(obj), axes=c(1,2), pt.alpha=0.5, pt.size=1.5, ell.width=1.2, dist.width=1, ct.size=5,
+                           ellipses=TRUE, centroids=FALSE, distances=FALSE) {
+  
+  if(length(axes)!=2) axes<-c(1,2)
+  
+  #create object for storing overall results, assign names
+  results <- vector(mode = "list", length = length(obj))
+  names(results) <- facnames <- names(obj)
+  
+  #get ordinations and Pc extremes for factor i
+  for(i in 1:length(obj)){
+    
+    #create object for storing results of factor i, assing names
+    results_i <- vector(mode = "list", length = 2)
+    names(results_i) <- c("ordination", "PC_extremes")
+    
+    #extract information for factor i
+    bgPCA <- obj[[i]]
+    groups <- bgPCA$groups
+    totvar <- bgPCA$totvar
+    ages <- bgPCA$ages
+    
     #set axes to either 1 (univariate plot) if the variable contains only two
     #groups, or 2 (bivariate plot) if it includes more groups
     num_functions <- 1
     if(ncol(bgPCA$x) >= 2) num_functions = 2
     
+    #gather data for plotting
+    to_plot <- data.frame(coordinates = bgPCA$x, groups = groups)
+    
     #plot chronospace
     if(num_functions == 1) { #univariate
-      to_plot <- data.frame(coordinates = bgPCA$x, groups = unname(groups[i]))
-      colors <- 1:nlevels(groups[,i])
       
       chronospace <- ggplot(to_plot, aes(x = coordinates, fill = groups)) + 
         geom_histogram(alpha = 0.5, position = 'identity', bins = 30) + theme_bw() + 
@@ -262,53 +293,47 @@ chronospace <- function(data_ages, factors, tree = NA, sdev = 1, distances=FALSE
         xlab(paste0('bgPCA axis 1 (', round((100*apply(bgPCA$x,2,var)[1]/totvar), 2), '% of variance)'))
       
     } else { #bivariate
+      #compue groups centroids from bgPCA scores
+      cents<-apply(X = bgPCA$x, MARGIN = 2, FUN = tapply, groups, mean)
+      cents_df<-data.frame(coordinates.1=cents[,1], coordinates.2=cents[,2], groups=rownames(cents))
       
-      to_plot <- data.frame(coordinates = bgPCA$x[,1:2], groups = unname(groups[i]))
-      colors <- 1:nlevels(groups[,i])
+      #compue groups centroids from original variables; calculate and standardize distances between centroids
+      cents_original<-apply(X = ages, MARGIN = 2, FUN = tapply, groups, mean)
+      dists<-as.matrix(dist(cents_original))
+      dists_std<-dists/max(dists)
       
-      if(!distances){
-        chronospace <- ggplot(to_plot, aes(x = coordinates.1, y = coordinates.2, color = groups)) + 
-          geom_point(alpha = 0.5, key_glyph = "point") + theme_bw() + scale_color_manual(values = colors) + 
-          xlab(paste0('bgPCA axis 1 (', round((100*apply(bgPCA$x,2,var)[1]/totvar), 2), '% of variance)')) + 
-          theme(legend.title = element_blank(), panel.grid = element_blank()) + 
-          ylab(paste0('bgPCA axis 2 (', round((100*apply(bgPCA$x,2,var)[2]/totvar), 2), '% of variance)')) +
-          stat_ellipse(lwd=1.5, key_glyph = "point") + 
-          guides(colour = guide_legend(override.aes = list(alpha=1, shape=21, color="black", fill = colors, size=3.5)))
-        
-        ### note : these are NOT confidence ellipses but data ellipses
-      } else {
-        
-        #compue groups centroids from bgPCA scores
-        centroids<-apply(X = bgPCA$x, MARGIN = 2, FUN = tapply, groups[,i], mean)
-        df<-data.frame(coordinates.1=centroids[,1], coordinates.2=centroids[,2], groups=rownames(centroids))
-        
-        #compue groups centroids from original variables; calculate and standardize distances between centroids
-        centroids_original<-apply(X = ages, MARGIN = 2, FUN = tapply, groups[,i], mean)
-        distances<-as.matrix(dist(centroids_original))
-        distances_std<-distances/max(distances)
-        
-        #generate combinations
-        combins<-combn(x = levels(groups[,i]), m = 2)
-        
-        #plot chronospace
-        chronospace <- ggplot(to_plot, aes(x = coordinates.1, y = coordinates.2, color = groups)) + 
-          geom_point(shape=21, alpha=0.2) + 
-          theme_bw() + scale_color_manual(values = colors) + 
-          theme(legend.title = element_blank(), panel.grid = element_blank()) +
-          xlab(paste0('bgPCA axis 1 (', round((100*apply(bgPCA$x,2,var)[1]/totvar), 2), '% of variance)')) + 
-          ylab(paste0('bgPCA axis 2 (', round((100*apply(bgPCA$x,2,var)[2]/totvar), 2), '% of variance)'))
-        
+      #generate combinations
+      combins<-combn(x = levels(groups), m = 2)
+      
+      #plot chronospace
+      chronospace<-ggplot(to_plot, aes(x = coordinates.1, y = coordinates.2, color = groups)) + 
+        geom_point(alpha = pt.alpha, size=pt.size, key_glyph = "point") + 
+        theme_bw() + scale_color_manual(values = colors) + 
+        theme(legend.title = element_blank(), panel.grid = element_blank()) + 
+        xlab(paste0('bgPCA axis ', axes[1],  ' (', round((100*apply(bgPCA$x,2,var)[1]/totvar), 2), '% of variance)')) + 
+        ylab(paste0('bgPCA axis ', axes[2],  ' (', round((100*apply(bgPCA$x,2,var)[2]/totvar), 2), '% of variance)'))
+      
+      if(ellipses){
+        chronospace <- chronospace + 
+          stat_ellipse(lwd=ell.width, key_glyph = "point")
+      }
+      
+      if(distances){
         for(h in 1:ncol(combins)){
           rdf<-df[combins[,h],]
-          width<-(5*distances_std[combins[1,h], combins[2,h]])-2
-          chronospace <- chronospace + geom_line(data=rdf, aes(x = coordinates.1, y = coordinates.2), color=gray.colors(n=10)[1], size=width)
+          width<-(5*dists_std[combins[1,h], combins[2,h]])-2
+          chronospace <- chronospace + geom_line(data=rdf, aes(x = coordinates.1, y = coordinates.2), color=gray.colors(n=10)[1], size=width*dist.width)
         }
-        
-        chronospace <- chronospace + 
-          geom_point(shape=21, data=df, color="black", fill = colors, aes(x = coordinates.1, y = coordinates.2), size=5) +
-          guides(colour = guide_legend(override.aes = list(alpha=1, shape=21, color="black", fill = colors, size=3.5)))
-        
       }
+      
+      if(centroids|distances){
+        chronospace <- chronospace + 
+          geom_point(shape=21, data=cents_df, color="black", fill = colors, aes(x = coordinates.1, y = coordinates.2), size=ct.size)
+      }
+      
+      chronospace <- chronospace + 
+        guides(colour = guide_legend(override.aes = list(alpha=1, shape=21, color="black", fill = colors[1:nlevels(groups)], size=3.5)))
+      
     }
     
     #save chronospace
@@ -331,6 +356,8 @@ chronospace <- function(data_ages, factors, tree = NA, sdev = 1, distances=FALSE
       #create object for storing the extremes of the bgPC j
       PCextremes <- vector(mode = "list", length = num_functions)
       
+      if(num_functions==1) ax<-1 else ax<-axes
+      
       #loop through the bgPCA axes (depending on the number of groups in the
       #variable being tested)
       for(j in 1:num_functions) {
@@ -340,8 +367,8 @@ chronospace <- function(data_ages, factors, tree = NA, sdev = 1, distances=FALSE
         
         #ages implied by moving along this bgPCA axis 'sdev' number of standard
         #deviations to both sides
-        assign(paste0('plus_sd_', j), revPCA(sdev*sd(bgPCA$x[,j]), bgPCA$rotation[,j], mean))
-        assign(paste0('minus_sd_', j), revPCA(-sdev*sd(bgPCA$x[,j]), bgPCA$rotation[,j], mean))
+        assign(paste0('plus_sd_', j), revPCA(sdev*sd(bgPCA$x[,ax[j]]), bgPCA$rotation[,ax[j]], mean))
+        assign(paste0('minus_sd_', j), revPCA(-sdev*sd(bgPCA$x[,ax[j]]), bgPCA$rotation[,ax[j]], mean))
         
         #check number of descendants stemming from each node
         clade_size <- unlist(lapply(clades, length))
@@ -469,7 +496,8 @@ chronospace <- function(data_ages, factors, tree = NA, sdev = 1, distances=FALSE
     
   }
   
-  return(results)
+  factors<-factors[!factors>length(results)]
+  return(results[factors])
   
 }
 
