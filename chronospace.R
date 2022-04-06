@@ -182,8 +182,12 @@ bgprcomp <- function(x, groups){
 }
 
 
+# internal reverse PCA function -----------------------------------------------------
+revPCA<-function(scores, vectors, center){ t(t(scores%*%t(vectors))+center) }
+
+
 #create chronospace-------------------------------------------------------------------
-chronospace <- function(data_ages, tree = NA, sdev = 1, 
+chronospace <- function(data_ages, tree = NA, sdev = 1, distances=FALSE,
                         variation = "non-redundant", timemarks = NULL) {
   
   #split data.frame 'data_ages' into ages and factors
@@ -192,7 +196,7 @@ chronospace <- function(data_ages, tree = NA, sdev = 1,
   
   #create object for storing overall results, assign names
   results <- vector(mode = "list", length = ncol(groups))
-  names(results) < -paste0("factor_", LETTERS[1:ncol(groups)])
+  names(results) <- paste0("factor_", LETTERS[1:ncol(groups)])
   
   #perform bgPCA using each factor separately
   for(i in 1:ncol(groups)) {
@@ -242,27 +246,62 @@ chronospace <- function(data_ages, tree = NA, sdev = 1,
     #plot chronospace
     if(num_functions == 1) { #univariate
       to_plot <- data.frame(coordinates = bgPCA$x, groups = unname(groups[i]))
-      colors_random <- brewer.pal(7, 'Set3')[-2][sample(1:6, 2)]
+      colors <- 1:nlevels(groups[,i])
       
       chronospace <- ggplot(to_plot, aes(x = coordinates, fill = groups)) + 
         geom_histogram(alpha = 0.5, position = 'identity', bins = 30) + theme_bw() + 
-        scale_fill_manual(values = colors_random) + ylab('Count') + 
+        scale_fill_manual(values = colors) + ylab('Count') + 
         theme(legend.title = element_blank(), panel.grid = element_blank()) +
         xlab(paste0('bgPCA axis 1 (', round((100*apply(bgPCA$x,2,var)[1]/totvar), 2), '% of variance)'))
       
     } else { #bivariate
-      to_plot <- data.frame(coordinates = bgPCA$x[,1:2], groups = unname(groups[i]))
-      colors_random <- brewer.pal(7, 'Set3')[-2][sample(1:6, nrow(unique(groups[i])))]
       
-      chronospace <- ggplot(to_plot, aes(x = coordinates.1, y = coordinates.2, color = groups)) + 
-        geom_point(alpha = 0.5) + theme_bw() + scale_color_manual(values = colors_random) + 
-        stat_conf_ellipse(aes(color = groups, fill = groups), alpha = 0.1, geom = "polygon") +
-        xlab(paste0('bgPCA axis 1 (', round((100*apply(bgPCA$x,2,var)[1]/totvar), 2), '% of variance)')) + 
-        theme(legend.title = element_blank(), panel.grid = element_blank()) + 
-        ylab(paste0('bgPCA axis 2 (', round((100*apply(bgPCA$x,2,var)[2]/totvar), 2), '% of variance)')) +
-        stat_ellipse(lwd=1.5)
-    
-      ### note : these are NOT confidence ellipses but data ellipses
+      to_plot <- data.frame(coordinates = bgPCA$x[,1:2], groups = unname(groups[i]))
+      colors <- 1:nlevels(groups[,i])
+      
+      if(!distances){
+        chronospace <- ggplot(to_plot, aes(x = coordinates.1, y = coordinates.2, color = groups)) + 
+          geom_point(alpha = 0.5, key_glyph = "point") + theme_bw() + scale_color_manual(values = colors) + 
+          xlab(paste0('bgPCA axis 1 (', round((100*apply(bgPCA$x,2,var)[1]/totvar), 2), '% of variance)')) + 
+          theme(legend.title = element_blank(), panel.grid = element_blank()) + 
+          ylab(paste0('bgPCA axis 2 (', round((100*apply(bgPCA$x,2,var)[2]/totvar), 2), '% of variance)')) +
+          stat_ellipse(lwd=1.5, key_glyph = "point") + 
+          guides(colour = guide_legend(override.aes = list(alpha=1, shape=21, color="black", fill = colors, size=3.5)))
+        
+        ### note : these are NOT confidence ellipses but data ellipses
+      } else {
+        
+        #compue groups centroids from bgPCA scores
+        centroids<-apply(X = bgPCA$x, MARGIN = 2, FUN = tapply, groups[,i], mean)
+        df<-data.frame(coordinates.1=centroids[,1], coordinates.2=centroids[,2], groups=rownames(centroids))
+        
+        #compue groups centroids from original variables; calculate and standardize distances between centroids
+        centroids_original<-apply(X = ages, MARGIN = 2, FUN = tapply, groups[,i], mean)
+        distances<-as.matrix(dist(centroids_original))
+        distances_std<-distances/max(distances)
+        
+        #generate combinations
+        combins<-combn(x = levels(groups[,i]), m = 2)
+        
+        #plot chronospace
+        chronospace <- ggplot(to_plot, aes(x = coordinates.1, y = coordinates.2, color = groups)) + 
+          geom_point(shape=21, alpha=0.2) + 
+          theme_bw() + scale_color_manual(values = colors) + 
+          theme(legend.title = element_blank(), panel.grid = element_blank()) +
+          xlab(paste0('bgPCA axis 1 (', round((100*apply(bgPCA$x,2,var)[1]/totvar), 2), '% of variance)')) + 
+          ylab(paste0('bgPCA axis 2 (', round((100*apply(bgPCA$x,2,var)[2]/totvar), 2), '% of variance)'))
+        
+        for(h in 1:ncol(combins)){
+          rdf<-df[combins[,h],]
+          width<-(5*distances_std[combins[1,h], combins[2,h]])-2
+          chronospace <- chronospace + geom_line(data=rdf, aes(x = coordinates.1, y = coordinates.2), color=gray.colors(n=10)[1], size=width)
+        }
+        
+        chronospace <- chronospace + 
+          geom_point(shape=21, data=df, color="black", fill = colors, aes(x = coordinates.1, y = coordinates.2), size=5) +
+          guides(colour = guide_legend(override.aes = list(alpha = 1, shape=16, size=3)))
+        
+      }
     }
     
     #save chronospace
@@ -294,8 +333,8 @@ chronospace <- function(data_ages, tree = NA, sdev = 1,
         
         #ages implied by moving along this bgPCA axis 'sdev' number of standard
         #deviations to both sides
-        assign(paste0('plus_sd_', j), showPC(sdev*sd(bgPCA$x[,j]), bgPCA$rotation[,j], mean))
-        assign(paste0('minus_sd_', j), showPC(-sdev*sd(bgPCA$x[,j]), bgPCA$rotation[,j], mean))
+        assign(paste0('plus_sd_', j), revPCA(sdev*sd(bgPCA$x[,j]), bgPCA$rotation[,j], mean))
+        assign(paste0('minus_sd_', j), revPCA(-sdev*sd(bgPCA$x[,j]), bgPCA$rotation[,j], mean))
         
         #check number of descendants stemming from each node
         clade_size <- unlist(lapply(clades, length))
@@ -314,9 +353,9 @@ chronospace <- function(data_ages, tree = NA, sdev = 1,
               node_to_change <- getMRCA(tree, unlist(clades[which_clades[l]]))
               
               #get node ages for this node
-              dif_minus <- get(paste0('minus_sd_', j))[which_clades[l],]
+              dif_minus <- get(paste0('minus_sd_', j))[,which_clades[l]]
               dif_mean <- mean[which_clades[l],]
-              dif_plus <- get(paste0('plus_sd_', j))[which_clades[l],]
+              dif_plus <- get(paste0('plus_sd_', j))[,which_clades[l]]
               
               #if the clade is a cherry (i.e., 2 descendants)
               if(k == 2) {
