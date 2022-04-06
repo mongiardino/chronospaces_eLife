@@ -161,7 +161,7 @@ extract_ages <- function(path = NA, type, sample) {
 
 
 # internal between-group PCA function ---------------------------------------------
-bgprcomp <- function(x, groups) {
+bgprcomp <- function(x, groups){
   
   grandmean <- colMeans(x)
   x_centered <- scale(x, scale = F, center = T)
@@ -170,7 +170,7 @@ bgprcomp <- function(x, groups) {
   V_g <- cov(x_gmeans)
   eig <- eigen(V_g)
   
-  scores <- x_centered %*% eig$vectors
+  scores <- x_centered%*%eig$vectors
   scores <- cbind(scores[,1:(nlevels(groups) - 1)])
   rotation <- eig$vectors
   
@@ -183,11 +183,11 @@ bgprcomp <- function(x, groups) {
 
 
 # internal reverse PCA function -----------------------------------------------------
-revPCA <- function(scores, vectors, center) t(t(scores %*% t(vectors)) + center)
+revPCA<-function(scores, vectors, center){ t(t(scores%*%t(vectors))+center) }
 
 
 #create chronospace-------------------------------------------------------------------
-chronospace <- function(data_ages, tree = NA, sdev = 1, distances = F,
+chronospace <- function(data_ages, tree = NA, sdev = 1, distances=FALSE,
                         variation = "non-redundant", timemarks = NULL) {
   
   #split data.frame 'data_ages' into ages and factors
@@ -213,7 +213,7 @@ chronospace <- function(data_ages, tree = NA, sdev = 1, distances = F,
     expvar <- sum(apply(bgPCA1$x, 2, var))
     perc_tot <- 100 * (expvar/totvar)
     
-    #use bgPCA to compute an ordination that is residual to all factors but factor i
+    #use bgPCA to compute an ordinaion that is residual to all factors but factor i
     bgPCA2.1 <- bgprcomp(x = ages, groups = groups[,-i])
     resids2.1 <- bgPCA2.1$residuals
     
@@ -271,18 +271,17 @@ chronospace <- function(data_ages, tree = NA, sdev = 1, distances = F,
         ### note : these are NOT confidence ellipses but data ellipses
       } else {
         
-        #compute groups centroids from bgPCA scores
-        centroids <- apply(X = bgPCA$x, MARGIN = 2, FUN = tapply, groups[,i], mean)
-        df <- data.frame(coordinates.1 = centroids[,1], coordinates.2 = centroids[,2], 
-                         groups = rownames(centroids))
+        #compue groups centroids from bgPCA scores
+        centroids<-apply(X = bgPCA$x, MARGIN = 2, FUN = tapply, groups[,i], mean)
+        df<-data.frame(coordinates.1=centroids[,1], coordinates.2=centroids[,2], groups=rownames(centroids))
         
-        #compute groups centroids from original variables; calculate and standardize distances between centroids
-        centroids_original <- apply(X = ages, MARGIN = 2, FUN = tapply, groups[,i], mean)
-        distances <- as.matrix(dist(centroids_original))
-        distances_std <- distances/max(distances)
+        #compue groups centroids from original variables; calculate and standardize distances between centroids
+        centroids_original<-apply(X = ages, MARGIN = 2, FUN = tapply, groups[,i], mean)
+        distances<-as.matrix(dist(centroids_original))
+        distances_std<-distances/max(distances)
         
         #generate combinations
-        combins <- combn(x = levels(groups[,i]), m = 2)
+        combins<-combn(x = levels(groups[,i]), m = 2)
         
         #plot chronospace
         chronospace <- ggplot(to_plot, aes(x = coordinates.1, y = coordinates.2, color = groups)) + 
@@ -577,53 +576,4 @@ senstitive_nodes <- function(data_ages, tree, amount_of_change,
   }
   
   return(results)
-}
-
-#LTT by group-------------------------------------------------------------------
-ltt_sensitivity <- function(data_ages, average = 'median') {
-  ages <- data_ages[,which(grepl('clade', colnames(data_ages)))]
-  groups <- data_ages[,which(grepl('factor', colnames(data_ages)))]
-  plots <- vector(mode = "list", length = ncol(groups))
-  
-  for(i in 1:ncol(groups)) {
-    sample <- nrow(groups)/length(unique(groups[,i]))
-    num_nodes <- ncol(ages)
-    
-    this_ages <- apply(ages, 1, sort)
-    this_groups <- groups[,i]
-    this_order <- order(this_groups)
-    
-    this_ages <- this_ages[,this_order]
-    this_groups <- this_groups[this_order]
-    
-    colnames(this_ages) <- 1:ncol(this_ages)
-    this_ages <- pivot_longer(as.tibble(this_ages), 1:ncol(this_ages)) %>% 
-      mutate(name = as.numeric(name)) %>% arrange(name, desc(value)) %>%
-       mutate(type = rep(as.character(unique(this_groups)), 
-                         each = sample * num_nodes), 
-              num_lineages = rep(2:(num_nodes + 1), length(this_groups)))
-    
-    if(average == 'mean') {
-      ages_average <- this_ages %>% group_by(type, num_lineages) %>% 
-        summarise(av_value = mean(value), .groups = 'drop')
-    }
-    if(average == 'median') {
-      ages_average <- this_ages %>% group_by(type, num_lineages) %>% 
-        summarise(av_value = median(value), .groups = 'drop')
-    }
-    
-    to_add <- ages_average %>% mutate(num_lineages = num_lineages - 1)
-    ages_average <- rbind(ages_average, to_add) %>% arrange(type, num_lineages)
-    
-    plots[[i]] <- ggplot(ages_average, aes(x = av_value, y = num_lineages, color = type)) + 
-      geom_line(alpha = 0.3, size = 2) + scale_y_log10() + scale_x_reverse() + 
-      theme_bw() + xlab('Age (Ma)') + ylab('Number of lineages')
-  }
-  
-  ltts <- annotate_figure(ggarrange(plotlist = plots, 
-                                    common.legend = F, legend = 'bottom', 
-                                    ncol = ncol(groups), nrow = 1))
-  
-  return(ltts)
-  
 }
