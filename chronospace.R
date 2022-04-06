@@ -293,11 +293,11 @@ plot.chronospace<-function(obj, tree=NA, sdev=1, timemarks = NULL,
         xlab(paste0('bgPCA axis 1 (', round((100*apply(bgPCA$x,2,var)[1]/totvar), 2), '% of variance)'))
       
     } else { #bivariate
-      #compue groups centroids from bgPCA scores
+      #compute groups centroids from bgPCA scores
       cents<-apply(X = bgPCA$x, MARGIN = 2, FUN = tapply, groups, mean)
       cents_df<-data.frame(coordinates.1=cents[,1], coordinates.2=cents[,2], groups=rownames(cents))
       
-      #compue groups centroids from original variables; calculate and standardize distances between centroids
+      #compute groups centroids from original variables; calculate and standardize distances between centroids
       cents_original<-apply(X = ages, MARGIN = 2, FUN = tapply, groups, mean)
       dists<-as.matrix(dist(cents_original))
       dists_std<-dists/max(dists)
@@ -320,7 +320,7 @@ plot.chronospace<-function(obj, tree=NA, sdev=1, timemarks = NULL,
       
       if(distances){
         for(h in 1:ncol(combins)){
-          rdf<-df[combins[,h],]
+          rdf<-cents_df[combins[,h],]
           width<-(5*dists_std[combins[1,h], combins[2,h]])-2
           chronospace <- chronospace + geom_line(data=rdf, aes(x = coordinates.1, y = coordinates.2), color=gray.colors(n=10)[1], size=width*dist.width)
         }
@@ -328,7 +328,7 @@ plot.chronospace<-function(obj, tree=NA, sdev=1, timemarks = NULL,
       
       if(centroids|distances){
         chronospace <- chronospace + 
-          geom_point(shape=21, data=cents_df, color="black", fill = colors, aes(x = coordinates.1, y = coordinates.2), size=ct.size)
+          geom_point(shape=21, data=cents_df, color="black", fill = colors[1:nlevels(groups)], aes(x = coordinates.1, y = coordinates.2), size=ct.size)
       }
       
       chronospace <- chronospace + 
