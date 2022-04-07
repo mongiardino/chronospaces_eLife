@@ -187,14 +187,15 @@ revPCA<-function(scores, vectors, center){ t(t(scores%*%t(vectors))+center) }
 
 
 #create chronospace-------------------------------------------------------------------
-chronospace <- function(data_ages, factors, variation = "non-redundant")  {
+chronospace <- function(data_ages, variation = "non-redundant")  {
   
-  #set objects
-  ages <- data_ages
-  if(is.null(dim(factors))) groups <- data.frame(factor=factors) else groups <- factors
+  #split data.frame 'data_ages' into ages and factors
+  ages <- data_ages[,which(grepl('clade', colnames(data_ages)))]
+  groups <- data_ages[,which(grepl('factor', colnames(data_ages)))]
   
   #factors names
-  facnames<-colnames(groups)
+  if(is.null(dim(groups))) groups <- data.frame(groups)
+  facnames<-paste0("factor_", LETTERS[1:ncol(groups)])
   
   #create object for storing overall results, assign names
   results <- vector(mode = "list", length = ncol(groups))
