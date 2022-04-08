@@ -1,6 +1,6 @@
 #Chronospace: a tool to visualize and quantify the effect of methodological
 #decisions on time-calibrated inference
-#Writen by Nicolas Mongiardino Koch 05/2021
+#Written by Nicolas Mongiardino Koch and Pablo Milla Carmona 2021-2022
 
 #This script requires as input a series of tree files in newick format,
 #representing separate Bayesian time-calibrated inferences of the same dataset
@@ -79,7 +79,7 @@ extract_ages <- function(path = NA, type, sample) {
   #check that tree files and factors provided in 'types' match correctly
   cat("Check that labels are assigned correctly to the input files.\n", 
       "If there is an error, modify the order of factors in 'type'\n", 
-      "or the name of input files for the two to match.\n\n", sep = '')
+      "or the name of input files, for the two to match.\n\n", sep = '')
   
   for(i in 1:length(files)) {
     to_print <- paste0('file = ', files[i], ' | type = ', 
@@ -161,7 +161,7 @@ extract_ages <- function(path = NA, type, sample) {
 
 
 # internal between-group PCA function ---------------------------------------------
-bgprcomp <- function(x, groups){
+bgprcomp <- function(x, groups) {
   
   grandmean <- colMeans(x)
   x_centered <- scale(x, scale = F, center = T)
@@ -183,7 +183,7 @@ bgprcomp <- function(x, groups){
 
 
 # internal reverse PCA function -----------------------------------------------------
-revPCA<-function(scores, vectors, center){ t(t(scores%*%t(vectors))+center) }
+revPCA <- function(scores, vectors, center) { t(t(scores %*% t(vectors)) + center) }
 
 
 #create chronospace-------------------------------------------------------------------
@@ -195,7 +195,7 @@ chronospace <- function(data_ages, variation = "non-redundant")  {
   
   #factors names
   if(is.null(dim(groups))) groups <- data.frame(groups)
-  facnames<-paste0("factor_", LETTERS[1:ncol(groups)])
+  facnames <- paste0("factor_", LETTERS[1:ncol(groups)])
   
   #create object for storing overall results, assign names
   results <- vector(mode = "list", length = ncol(groups))
@@ -213,13 +213,20 @@ chronospace <- function(data_ages, variation = "non-redundant")  {
     perc_tot <- 100 * (expvar/totvar)
     
     #report proportion of total variation explained
+    if(ncol(groups) > 1) {
+      catnames <- paste0('(', paste(unique(groups[,i]), collapse = '/'), ')')
+      cat(paste('--- Results for', facnames[i], catnames, '---\n'))
+    } else {
+      cat('Results:\n')
+    }
+    
     cat(paste0('Proportion of total variation in node ages explained by ', 
                facnames[i], ' = ', 
                round(perc_tot, digits=3), 
                '%', '\n'))
     
-    if(ncol(groups)>1){
-      #use bgPCA to compute an ordinaion that is residual to all factors but factor i
+    if(ncol(groups) > 1){
+      #use bgPCA to compute an ordination that is residual to all factors but factor i
       bgPCA2.1 <- bgprcomp(x = ages, groups = groups[,-i])
       resids2.1 <- bgPCA2.1$residuals
       
@@ -234,18 +241,20 @@ chronospace <- function(data_ages, variation = "non-redundant")  {
       cat(paste0('Proportion of non-redundant variation in node ages explained by ', 
                  facnames[i], ' = ', 
                  round(perc_nonred, digits=3), 
-                 '%', '\n'))
-    } else {cat('(There is only one factor, non-redundant variation omitted)\n')}
+                 '%', '\n\n'))
+    } else {
+      cat('(There is only one factor, non-redundant variation omitted)\n\n')
+    }
     
     #select which bgPCA results are going to be used
-    if(variation == "total" | ncol(groups)==1) bgPCA <- bgPCA1
-    if(variation == "non-redundant" & ncol(groups)>1) bgPCA <- bgPCA2.2
+    if(variation == "total" | ncol(groups) == 1) bgPCA <- bgPCA1
+    if(variation == "non-redundant" & ncol(groups) > 1) bgPCA <- bgPCA2.2
     
     #store bgPCA results, along with total variation and groups of factor i
-    bgPCA$totvar<-totvar
-    bgPCA$groups<-groups[,i]
-    bgPCA$ages<-ages
-    results[[i]]<-bgPCA
+    bgPCA$totvar <- totvar
+    bgPCA$groups <- groups[,i]
+    bgPCA$ages <- ages
+    results[[i]] <- bgPCA
   }
   
   return(invisible(results))
@@ -253,17 +262,19 @@ chronospace <- function(data_ages, variation = "non-redundant")  {
 
 
 #plot chronospace-------------------------------------------------------------------
-plot.chronospace<-function(obj, tree=NA, sdev=1, timemarks = NULL,
-                           colors=1:5, factors=1:length(obj), axes=c(1,2), pt.alpha=0.5, pt.size=1.5, ell.width=1.2, dist.width=1, ct.size=5,
-                           ellipses=TRUE, centroids=FALSE, distances=FALSE) {
+plot.chronospace <- function(obj, tree = NA, sdev = 1, timemarks = NULL,
+                           colors = 1:5, factors = 1:length(obj), axes = c(1,2), 
+                           pt.alpha = 0.5, pt.size = 1.5, ell.width = 1.2, 
+                           dist.width = 1, ct.size = 5, ellipses = TRUE, 
+                           centroids = FALSE, distances = FALSE) {
   
-  if(length(axes)!=2) axes<-c(1,2)
+  if(length(axes) != 2) axes <- c(1,2)
   
   #create object for storing overall results, assign names
   results <- vector(mode = "list", length = length(obj))
   names(results) <- facnames <- names(obj)
   
-  #get ordinations and Pc extremes for factor i
+  #get ordinations and PC extremes for factor i
   for(i in 1:length(obj)){
     
     #create object for storing results of factor i, assing names
@@ -295,69 +306,87 @@ plot.chronospace<-function(obj, tree=NA, sdev=1, timemarks = NULL,
       
     } else { #bivariate
       #compute groups centroids from bgPCA scores
-      cents<-apply(X = bgPCA$x, MARGIN = 2, FUN = tapply, groups, mean)
-      cents_df<-data.frame(coordinates.1=cents[,1], coordinates.2=cents[,2], groups=rownames(cents))
+      cents <- apply(X = bgPCA$x, MARGIN = 2, FUN = tapply, groups, mean)
+      cents_df <- data.frame(coordinates.1 = cents[,1], 
+                             coordinates.2 = cents[,2], 
+                             groups = rownames(cents))
       
-      #compute groups centroids from original variables; calculate and standardize distances between centroids
-      cents_original<-apply(X = ages, MARGIN = 2, FUN = tapply, groups, mean)
-      dists<-as.matrix(dist(cents_original))
-      dists_std<-dists/max(dists)
+      #compute groups centroids from original variables; 
+      #calculate and standardize distances between centroids
+      cents_original <- apply(X = ages, MARGIN = 2, FUN = tapply, groups, mean)
+      dists <- as.matrix(dist(cents_original))
+      dists_std <- dists/max(dists)
       
       #generate combinations
-      combins<-combn(x = levels(groups), m = 2)
+      combins <- combn(x = levels(groups), m = 2)
       
       #plot chronospace
-      chronospace<-ggplot(to_plot, aes(x = coordinates.1, y = coordinates.2, color = groups)) + 
+      chronospace <- ggplot(to_plot, aes(x = coordinates.1, y = coordinates.2, color = groups)) + 
         geom_point(alpha = pt.alpha, size=pt.size, key_glyph = "point") + 
         theme_bw() + scale_color_manual(values = colors) + 
         theme(legend.title = element_blank(), panel.grid = element_blank()) + 
-        xlab(paste0('bgPCA axis ', axes[1],  ' (', round((100*apply(bgPCA$x,2,var)[1]/totvar), 2), '% of variance)')) + 
-        ylab(paste0('bgPCA axis ', axes[2],  ' (', round((100*apply(bgPCA$x,2,var)[2]/totvar), 2), '% of variance)'))
+        xlab(paste0('bgPCA axis ', axes[1],  ' (', 
+                    round((100*apply(bgPCA$x,2,var)[1]/totvar), 2), '% of variance)')) + 
+        ylab(paste0('bgPCA axis ', axes[2],  ' (', 
+                    round((100*apply(bgPCA$x,2,var)[2]/totvar), 2), '% of variance)'))
       
       if(ellipses){
         chronospace <- chronospace + 
-          stat_ellipse(lwd=ell.width, key_glyph = "point")
+          stat_ellipse(lwd = ell.width, key_glyph = "point")
       }
       
       if(distances){
         for(h in 1:ncol(combins)){
-          rdf<-cents_df[combins[,h],]
-          width<-(5*dists_std[combins[1,h], combins[2,h]])-2
-          chronospace <- chronospace + geom_line(data=rdf, aes(x = coordinates.1, y = coordinates.2), color=gray.colors(n=10)[1], size=width*dist.width)
+          rdf <- cents_df[combins[,h],]
+          width <- (5*dists_std[combins[1,h], combins[2,h]]) - 2
+          chronospace <- chronospace + 
+            geom_line(data = rdf, aes(x = coordinates.1, y = coordinates.2), 
+                      color = gray.colors(n = 10)[1], size = width*dist.width)
         }
       }
       
       if(centroids|distances){
         chronospace <- chronospace + 
-          geom_point(shape=21, data=cents_df, color="black", fill = colors[1:nlevels(groups)], aes(x = coordinates.1, y = coordinates.2), size=ct.size)
+          geom_point(data = cents_df, aes(x = coordinates.1, y = coordinates.2), 
+                     color = "black", shape = 21, 
+                     fill = colors[1:nlevels(groups)], 
+                     size = ct.size)
       }
       
       chronospace <- chronospace + 
-        guides(colour = guide_legend(override.aes = list(alpha=1, shape=21, color="black", fill = colors[1:nlevels(groups)], size=3.5)))
+        guides(colour = guide_legend(override.aes = list(alpha = 1, shape = 21, 
+                                                         color = "black", 
+                                                         fill = colors[1:nlevels(groups)], 
+                                                         size = 3.5)))
       
     }
     
     #save chronospace
     results_i$ordination <- chronospace
     
-    #obtain clades from tree
-    clades <- list()
-    for(j in 1:tree$Nnode) {
-      clades[j] <- list(tree$tip.label[unlist(Descendants(tree, length(tree$tip.label)+j, type = 'tips'))])
-    }
-    
     #Finally, compute changes in each branch captured by the bgPCA axes (needs a
     #tree!)
     if(is.na(tree)[1]) {
       cat('Plotting changes on branch lengths can only be shown if a tree is provided\n')
     } else {
+      #obtain clades from tree
+      clades <- list()
+      for(j in 1:tree$Nnode) {
+        clades[j] <- list(tree$tip.label[unlist(Descendants(tree, length(tree$tip.label)+j, 
+                                                            type = 'tips'))])
+      }
+      
       #ages implied by a position at the origin of the bgPCA plot
       mean <- matrix(colMeans(ages), ncol = 1)
       
       #create object for storing the extremes of the bgPC j
       PCextremes <- vector(mode = "list", length = num_functions)
       
-      if(num_functions==1) ax<-1 else ax<-axes
+      if(num_functions == 1) {
+        ax <- 1
+      } else {
+        ax <- axes
+      }
       
       #loop through the bgPCA axes (depending on the number of groups in the
       #variable being tested)
@@ -368,8 +397,10 @@ plot.chronospace<-function(obj, tree=NA, sdev=1, timemarks = NULL,
         
         #ages implied by moving along this bgPCA axis 'sdev' number of standard
         #deviations to both sides
-        assign(paste0('plus_sd_', j), revPCA(sdev*sd(bgPCA$x[,ax[j]]), bgPCA$rotation[,ax[j]], mean))
-        assign(paste0('minus_sd_', j), revPCA(-sdev*sd(bgPCA$x[,ax[j]]), bgPCA$rotation[,ax[j]], mean))
+        assign(paste0('plus_sd_', j), revPCA(sdev*sd(bgPCA$x[,ax[j]]), 
+                                             bgPCA$rotation[,ax[j]], mean))
+        assign(paste0('minus_sd_', j), revPCA(-sdev*sd(bgPCA$x[,ax[j]]), 
+                                              bgPCA$rotation[,ax[j]], mean))
         
         #check number of descendants stemming from each node
         clade_size <- unlist(lapply(clades, length))
@@ -404,7 +435,8 @@ plot.chronospace<-function(obj, tree=NA, sdev=1, timemarks = NULL,
                 #if it is not a cherry
               } else {
                 #get nodes of direct descendant
-                nodes_of_descendants <- tree$edge[,2][which(tree$edge[,1] == node_to_change)]
+                nodes_of_descendants <- tree$edge[,2][which(tree$edge[,1] == 
+                                                              node_to_change)]
                 
                 #if any descendant is a tip do as above, assign branch length ==
                 #node age
@@ -482,7 +514,7 @@ plot.chronospace<-function(obj, tree=NA, sdev=1, timemarks = NULL,
         
         #combine both into a single graphic and store
         PCextremes[[j]] <- negative + positive + plot_layout(guides = "collect") & 
-          theme(legend.position="bottom")
+          theme(legend.position = "bottom")
         
       }
       
@@ -497,14 +529,14 @@ plot.chronospace<-function(obj, tree=NA, sdev=1, timemarks = NULL,
     
   }
   
-  factors<-factors[!factors>length(results)]
+  factors <- factors[!factors > length(results)]
   return(results[factors])
   
 }
 
 #get senstive nodes ----------------------------------------------------
-sensitive_nodes <- function(obj, tree, amount_of_change, factors=1:length(obj), 
-                            chosen_clades, colors=1:5){
+sensitive_nodes <- function(obj, tree, amount_of_change, factors = 1:length(obj), 
+                            chosen_clades, colors = 1:5){
   
   #create object for storing overall results, assign names
   results <- vector(mode = "list", length = length(obj))
@@ -610,12 +642,13 @@ sensitive_nodes <- function(obj, tree, amount_of_change, factors=1:length(obj),
     results[[i]] <- most_affected
   }
   
-  factors<-factors[!factors>length(results)]
+  factors <- factors[!factors > length(results)]
   return(results[factors])
 }
 
 #LTT by group-------------------------------------------------------------------
 ltt_sensitivity <- function(data_ages, average = 'median') {
+  
   ages <- data_ages[,which(grepl('clade', colnames(data_ages)))]
   groups <- data_ages[,which(grepl('factor', colnames(data_ages)))]
   plots <- vector(mode = "list", length = ncol(groups))
