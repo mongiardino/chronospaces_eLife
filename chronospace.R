@@ -91,7 +91,11 @@ extract_ages <- function(path = NA, type, sample) {
   #loop through the tree files, load them and subsample them to the number
   #specified in 'sample'
   for(i in 1:length(files)) {
-    if(is.na(path)) trees <- read.tree(paste0(getwd(), '/', files[i])) else trees <- read.tree(paste0(path, '/', files[i]))
+    if(is.na(path)) {
+      trees <- read.tree(paste0(getwd(), '/', files[i]))
+    } else {
+        trees <- read.tree(paste0(path, '/', files[i]))
+        }
     if(!is.na(sample)) {
       trees <- trees[sample(1:length(trees), sample)]
     }
