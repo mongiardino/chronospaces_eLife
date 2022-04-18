@@ -91,7 +91,7 @@ extract_ages <- function(path = NA, type, sample) {
   #loop through the tree files, load them and subsample them to the number
   #specified in 'sample'
   for(i in 1:length(files)) {
-    trees <- read.tree(paste0(getwd(), '/', files[i]))
+    if(is.na(path)) trees <- read.tree(paste0(getwd(), '/', files[i])) else trees <- read.tree(paste0(path, '/', files[i]))
     if(!is.na(sample)) {
       trees <- trees[sample(1:length(trees), sample)]
     }
@@ -632,7 +632,7 @@ ltt_sensitivity <- function(data_ages, average = 'median') {
     this_groups <- this_groups[this_order]
     
     colnames(this_ages) <- 1:ncol(this_ages)
-    this_ages <- pivot_longer(as.tibble(this_ages), 1:ncol(this_ages)) %>% 
+    this_ages <- pivot_longer(as_tibble(this_ages), 1:ncol(this_ages)) %>% 
       mutate(name = as.numeric(name)) %>% arrange(name, desc(value)) %>%
       mutate(type = rep(as.character(unique(this_groups)), 
                         each = sample * num_nodes), 
