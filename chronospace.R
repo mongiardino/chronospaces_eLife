@@ -226,7 +226,7 @@ chronospace <- function(data_ages, variation = "non-redundant")  {
     
     cat(paste0('Proportion of total variation in node ages explained by ', 
                facnames[i], ' = ', 
-               round(perc_tot, digits=3), 
+               round(perc_tot, digits = 3), 
                '%', '\n'))
     
     if(ncol(groups) > 1){
@@ -244,7 +244,7 @@ chronospace <- function(data_ages, variation = "non-redundant")  {
       #report proportion of non-redundant variation explained
       cat(paste0('Proportion of non-redundant variation in node ages explained by ', 
                  facnames[i], ' = ', 
-                 round(perc_nonred, digits=3), 
+                 round(perc_nonred, digits = 3), 
                  '%', '\n\n'))
     } else {
       cat('(There is only one factor, non-redundant variation omitted)\n\n')
@@ -272,7 +272,7 @@ plot.chronospace <- function(obj, tree = NA, sdev = 1, timemarks = NULL,
                            dist.width = 1, ct.size = 5, ellipses = TRUE, 
                            centroids = FALSE, distances = FALSE) {
   
-  if(length(axes) != 2) axes <- c(1,2)
+  if(length(axes) != 2) axes <- c(1, 2)
   
   #create object for storing overall results, assign names
   results <- vector(mode = "list", length = length(obj))
@@ -306,7 +306,8 @@ plot.chronospace <- function(obj, tree = NA, sdev = 1, timemarks = NULL,
         geom_histogram(alpha = 0.5, position = 'identity', bins = 30) + theme_bw() + 
         scale_fill_manual(values = colors) + ylab('Count') + 
         theme(legend.title = element_blank(), panel.grid = element_blank()) +
-        xlab(paste0('bgPCA axis 1 (', round((100*apply(bgPCA$x,2,var)[1]/totvar), 2), '% of variance)'))
+        xlab(paste0('bgPCA axis 1 (', 
+                    round((100 * apply(bgPCA$x,2,var)[1] / totvar), 2), '% of variance)'))
       
     } else { #bivariate
       #compute groups centroids from bgPCA scores
@@ -319,20 +320,20 @@ plot.chronospace <- function(obj, tree = NA, sdev = 1, timemarks = NULL,
       #calculate and standardize distances between centroids
       cents_original <- apply(X = ages, MARGIN = 2, FUN = tapply, groups, mean)
       dists <- as.matrix(dist(cents_original))
-      dists_std <- dists/max(dists)
+      dists_std <- dists / max(dists)
       
       #generate combinations
       combins <- combn(x = levels(groups), m = 2)
       
       #plot chronospace
       chronospace <- ggplot(to_plot, aes(x = coordinates.1, y = coordinates.2, color = groups)) + 
-        geom_point(alpha = pt.alpha, size=pt.size, key_glyph = "point") + 
+        geom_point(alpha = pt.alpha, size = pt.size, key_glyph = "point") + 
         theme_bw() + scale_color_manual(values = colors) + 
         theme(legend.title = element_blank(), panel.grid = element_blank()) + 
         xlab(paste0('bgPCA axis ', axes[1],  ' (', 
-                    round((100*apply(bgPCA$x,2,var)[1]/totvar), 2), '% of variance)')) + 
+                    round((100 * apply(bgPCA$x,2,var)[1] / totvar), 2), '% of variance)')) + 
         ylab(paste0('bgPCA axis ', axes[2],  ' (', 
-                    round((100*apply(bgPCA$x,2,var)[2]/totvar), 2), '% of variance)'))
+                    round((100 * apply(bgPCA$x,2,var)[2] / totvar), 2), '% of variance)'))
       
       if(ellipses){
         chronospace <- chronospace + 
@@ -342,14 +343,14 @@ plot.chronospace <- function(obj, tree = NA, sdev = 1, timemarks = NULL,
       if(distances){
         for(h in 1:ncol(combins)){
           rdf <- cents_df[combins[,h],]
-          width <- (5*dists_std[combins[1,h], combins[2,h]]) - 2
+          width <- (5 * dists_std[combins[1,h], combins[2,h]]) - 2
           chronospace <- chronospace + 
             geom_line(data = rdf, aes(x = coordinates.1, y = coordinates.2), 
-                      color = gray.colors(n = 10)[1], size = width*dist.width)
+                      color = gray.colors(n = 10)[1], size = width * dist.width)
         }
       }
       
-      if(centroids|distances){
+      if(centroids | distances){
         chronospace <- chronospace + 
           geom_point(data = cents_df, aes(x = coordinates.1, y = coordinates.2), 
                      color = "black", shape = 21, 
@@ -376,7 +377,7 @@ plot.chronospace <- function(obj, tree = NA, sdev = 1, timemarks = NULL,
       #obtain clades from tree
       clades <- list()
       for(j in 1:tree$Nnode) {
-        clades[j] <- list(tree$tip.label[unlist(Descendants(tree, length(tree$tip.label)+j, 
+        clades[j] <- list(tree$tip.label[unlist(Descendants(tree, length(tree$tip.label) + j, 
                                                             type = 'tips'))])
       }
       
